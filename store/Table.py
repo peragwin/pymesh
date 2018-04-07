@@ -1,4 +1,4 @@
-from Data import Data, Key
+from Data import Data
 
 class Table(Data):
     def __init__(self, data_path: str):

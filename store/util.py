@@ -6,22 +6,28 @@ def fmt_time(t: int) -> bytes:
 
 def parse_time(t: bytes) -> int:
     tt = tuple(int(v) for v in t.split('-'))
-    return time.mktime(t[:6])
+    return time.mktime(tt[:6])
 
 class Key:
     time = 0
     device_id = b''
     data_id = b''
 
-    def __init__(self, k: bytes):
-        t, p, i = k.split(b':')
-        self.time = parse_time(t)
-        self.device_id = p
-        self.data_id = i
+    def __init__(self, k: bytes = b'', tim=0, device_id=b'', data_id=b''):
+        if k:
+            t, p, d = k.split(b':')
+            self.time = parse_time(t)
+            self.device_id = p
+            self.data_id = d
+        else:
+            self.time = parse_time(tim)
+            self.device_id = device_id
+            self.data_id = data_id
+
 
     def string(self):
-        t = time.localtime(self.time)
-        return t.join('-')
+        t = fmt_time(self.time)
+        return t + b':' + self.device_id + b':' + self.data_id
 
 
 class Path:
