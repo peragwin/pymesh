@@ -17,6 +17,7 @@ class Data:
         self.db = db
 
     def close(self):
+        self.db.flush()
         self.db.close()
         self._file.close()
 

@@ -1,41 +1,48 @@
-from os import path
+import os
 import btree
 
-from Table import Table
+from store.Table import Table
 
-MAX_OPEN_TABLES = 8
+MAX_OPEN_TABLES = 2
 
 class Store:
     """ A Store is a collection of tables """
     def __init__(self, store_path: str):
         self.path = store_path
         try:
-            assert path.isdir(self.path)
+            os.stat(self.path)
         except OSError:
-            print("path '%s' not found" % store_path)
-            raise
+            print("path '%s' not found; creating" % store_path)
+            os.mkdir(self.path)
 
         self._open_tables = {}
         self._lr_opened_tables = []
 
-    def open_table(self, path: str) -> Table:
-        path = self.path + path
+    def open_table(self, pth: str) -> Table:
+        print("before prepend:", pth)
+        path = self.path + pth
+        print("after prepend:", path)
         try:
             table = self._open_tables[path]
         except KeyError:
             table = Table(path)
+            print("opened:", table.path)
         
         self._open_tables[path] = table
         self._lr_opened_tables = [path] + self._lr_opened_tables
+        print(self._open_tables, self._lr_opened_tables)
 
         if len(self._lr_opened_tables) > MAX_OPEN_TABLES:
             path = self._lr_opened_tables.pop()
-            self.close_table(path)
+            self._close_table(path)
 
         return table
 
-    def close_table(self, path: str):
-        path = self.path + path
+    def close_table(self, pth: str):
+        path = self.path + pth
+        self._close_table(path)
+    
+    def _close_table(self, path: str):
         table = self._open_tables[path]
         table.close()
         del self._open_tables[path]
@@ -48,12 +55,12 @@ class Store:
 
     def read(self, path: str, key: bytes) -> bytes:
         table = self.open_table(path)
-        if key in table.db:
-            return table.db[key]
+        return table.db[key]
 
     def write(self, path: str, key: bytes, value: bytes):
         table = self.open_table(path)
         table.db[key] = value
+        table.db.flush()
 
     def latest(self, path: str) -> tuple:
         table = self.open_table(path)

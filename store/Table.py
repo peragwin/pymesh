@@ -1,8 +1,23 @@
-from Data import Data
+import os
+from store.Data import Data
+
+def traverse(path: str):
+    p = ''
+    for elm in path.split('/'):
+        p += '/' + elm
+        yield p
 
 class Table(Data):
     def __init__(self, data_path: str):
         p = data_path + '/.data'
+
+        for path in traverse(data_path):
+            try:
+                os.stat(path)
+            except:
+                print("path '%s' not found; creating" % path)
+                os.mkdir(path)
+
         super().__init__(p)
 
         # meta_path = path_prefix + data_path + '/.meta'

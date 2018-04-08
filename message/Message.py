@@ -1,6 +1,6 @@
 import time
 import uhashlib
-import bson
+import json
 from store.util import Key
 
 ACTION_WRITE = 1
@@ -18,16 +18,16 @@ class Message:
         self.value = value
         self.action = action
 
-    def marshall_BSON(self) -> bytes:
-        return bytes(bson.dumps({
+    def marshall_JSON(self) -> bytes:
+        return bytes(json.dumps({
             'p': self.path,
             'k': self.key.string(),
             'v': self.value,
             'a': self.action,
         }), 'utf-8')
 
-    def unmarshall_BSON(self, b: bytes):
-        d = bson.loads(str(b))
+    def unmarshall_JSON(self, b: bytes):
+        d = json.loads(str(b))
         self.path = d['p']
         self.key = Key(d['k'])
         self.value = d['v']

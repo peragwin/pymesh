@@ -2,10 +2,10 @@ import time
 
 def fmt_time(t: int) -> bytes:
     tt = time.localtime(t)
-    return b'-'.join(tt[:6])
+    return bytes('-'.join(str(v) for v in tt[:6]), 'utf-8')
 
 def parse_time(t: bytes) -> int:
-    tt = tuple(int(v) for v in t.split('-'))
+    tt = tuple(int(v) for v in t.split(b'-'))
     return time.mktime(tt[:6])
 
 class Key:
@@ -20,7 +20,7 @@ class Key:
             self.device_id = p
             self.data_id = d
         else:
-            self.time = parse_time(tim)
+            self.time = tim
             self.device_id = device_id
             self.data_id = data_id
 

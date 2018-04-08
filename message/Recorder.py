@@ -1,5 +1,4 @@
 import time
-import bson
 
 from store.util import Key
 from store.Store import Store
@@ -10,12 +9,11 @@ class MessageRecorder(Store):
     def __init__(self, store_path: str, expiry: int):
         super().__init__(store_path)
         self.expiry = expiry
-        self.meta = self.open_table(store_path + '/meta')
+        self.meta = self.open_table('/meta')
 
     @staticmethod
     def new_record_state(msg: Message) -> tuple:
-        path = msg.key.string() + b':' + msg.path
-        return (path, False)
+        return msg.key.string() + b':' + msg.path
 
     @staticmethod
     def parse_record_state(s: bytes) -> Message:
@@ -25,22 +23,22 @@ class MessageRecorder(Store):
 
     def record(self, msg: Message):
         if msg.action == ACTION_RECEIVED:
-            path, _ = self.new_record_state(msg)
+            path = self.new_record_state(msg)
             if path in self.meta.db:
                 del self.meta.db[path]
             return
 
         elif msg.action == ACTION_WRITE:
-            self.write(msg.path, msg.key, msg.value)
+            self.write(msg.path, msg.key.string(), msg.value)
             self._record_meta(msg)
             return
         
         elif msg.action == ACTION_REQUEST:
-            return self.read(msg.path, msg.key)
+            return self.read(msg.path, msg.key.string())
 
     def _record_meta(self, msg: Message):
-        path, value = self.new_record_state(msg)
-        self.meta[path] = value
+        path = self.new_record_state(msg)
+        self.meta.db[path] = b''
 
     def prune(self):
         """ prune messages after the expiry """
@@ -48,3 +46,5 @@ class MessageRecorder(Store):
             key = self.parse_record_state(k).key
             if key.time < (time.time() - self.expiry):
                 del self.meta.db[k]
+
+        self.meta.db.flush()
