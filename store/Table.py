@@ -8,7 +8,7 @@ def traverse(path: str):
         yield p
 
 class Table(Data):
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str, **kwargs):
         p = data_path + '/.data'
 
         for path in traverse(data_path):
@@ -18,5 +18,5 @@ class Table(Data):
                 print("path '%s' not found; creating" % path)
                 os.mkdir(path)
 
-        super().__init__(p)
+        super().__init__(p, **kwargs)
 

@@ -3,7 +3,7 @@ import btree
 
 from store.Data import Data
 from store.Table import Table
-from store.util import Key
+from store.Key import Key
 
 MAX_OPEN_TABLES = 4
 
@@ -44,7 +44,7 @@ class Store:
         self._open_tables = {}
         self._lr_opened_tables = []
 
-    def open_table(self, pth: str) -> Table:
+    def open_table(self, pth: str, **kwargs) -> Table:
         # print("before prepend:", pth)
         path = self.path + pth
         # print("after prepend:", path)
@@ -60,7 +60,7 @@ class Store:
                 path = self._lr_opened_tables.pop(0)
                 self._close_table(path)
 
-            table = Table(path)
+            table = Table(path, **kwargs)
             print("opened:", path)
         
             self._open_tables[path] = table

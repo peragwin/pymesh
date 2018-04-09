@@ -20,8 +20,7 @@ class Node:
     """ Node represents a node of the network """
     def __init__(self):
 
-        self.store = MessageRecorder(STORE_PATH, DEFAULT_MESSAGE_EXPIRY)
-
+        
         self.ap_if = ap = network.WLAN(network.AP_IF)
         self.sta_if = sta = network.WLAN(network.STA_IF)
         ap.active(True)
@@ -29,6 +28,8 @@ class Node:
 
         from ubinascii import hexlify
         self.device_id = hexlify(ap.config('mac'))
+
+        self.store = MessageRecorder(STORE_PATH, self.device_id, DEFAULT_MESSAGE_EXPIRY)
 
         self.configure_ap()
         self.configure_sta()
@@ -118,7 +119,6 @@ class Node:
 
                     except ValueError: # Config for AP not in storage
                         pass
-
 
     def write_local(self, path: str, value: bytes):
         msg = new_message(path, self.device_id, value, ACTION_WRITE, DEST_LOCAL)

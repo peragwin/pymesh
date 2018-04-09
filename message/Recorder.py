@@ -1,50 +1,59 @@
 import time
 
-from store.util import Key
+from store.Key import Key
 from store.Store import Store
-from message.Message import Message, ACTION_RECEIVED, ACTION_WRITE, ACTION_REQUEST
+from message.Message import (Message, ACTION_RECEIVED, ACTION_WRITE, ACTION_REQUEST,
+    ACTION_RESPONSE, DEST_LOCAL, DEST_UPLINK, DEST_NODE)
 
 class MessageRecorder(Store):
 
-    def __init__(self, store_path: str, expiry: int):
+    def __init__(self, store_path: str, node_id: bytes, expiry: int, is_uplink=False):
         super().__init__(store_path)
+        self.node_id = node_id
         self.expiry = expiry
-        self.meta = self.open_table('/meta')
-
-    @staticmethod
-    def new_record_state(msg: Message) -> tuple:
-        return msg.key.string() + b':' + msg.path
-
-    @staticmethod
-    def parse_record_state(s: bytes) -> Message:
-        key_s, path = s.split(b':')
-        key = Key(key_s)
-        return Message(path, key, b'', 0)
+        self.is_uplink = is_uplink
+        self.meta = self.open_table('/meta', cache_size=4096)
 
     def record(self, msg: Message):
         if msg.action == ACTION_RECEIVED:
-            path = self.new_record_state(msg)
-            if path in self.meta.db:
-                del self.meta.db[path]
-            return
+            key = msg.key.string()
+            if key in self.meta.db:
+                del self.meta.db[key]
 
         elif msg.action == ACTION_WRITE:
             self.write(msg.path, msg.key.string(), msg.value)
-            self._record_meta(msg)
-            return
+            if msg.dest != DEST_LOCAL:
+                if msg.dest == DEST_NODE and msg.dest_node == self.node_id:
+                    return
+                self._record_message(msg)
         
         elif msg.action == ACTION_REQUEST:
-            return self.read(msg.path, msg.key.string())
+            try:
+                # If we have the requested data, create a response message with that data
+                key, val = self.latest(msg.path)
+                msg.key = Key(key)
+                msg.value = val
+                msg.action = ACTION_RESPONSE
+                self._record_message(msg)
+            except ValueError:
+                # Otherwise just store the message to forward it to other nodes
+                self._record_message(msg)
 
-    def _record_meta(self, msg: Message):
-        path = self.new_record_state(msg)
-        self.meta.db[path] = b''
+        elif msg.action == ACTION_RESPONSE:
+            if (msg.dest == DEST_NODE and msg.dest_node == self.node_id) or \
+                (msg.dest == DEST_UPLINK and self.is_uplink):
+                self.write(msg.path, msg.key.string(), msg.value)
 
-    def prune(self):
+    def _record_message(self, msg: Message):
+        key = msg.key.string()
+        self.meta.db[key] = msg.marshall_JSON()
+
+    def prune_messages(self):
         """ prune messages after the expiry """
+        now = time.time()
         for k in self.meta.db.keys():
-            key = self.parse_record_state(k).key
-            if key.time < (time.time() - self.expiry):
+            key = Key(k)
+            if key.time < (now - self.expiry):
                 del self.meta.db[k]
 
         self.meta.db.flush()

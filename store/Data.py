@@ -6,7 +6,7 @@ CACHE_SIZE = 1024
 class Data:
     """ Data implements a datastore """
 
-    def __init__(self, store_path: str):
+    def __init__(self, store_path: str, cache_size=CACHE_SIZE):
         try:
             f = open(store_path, "r+b")
         except OSError:
@@ -14,7 +14,7 @@ class Data:
         self._file = f
         self._path = store_path
 
-        db = btree.open(f, cachesize=CACHE_SIZE)
+        db = btree.open(f, cachesize=cache_size)
         self.db = db
 
     def close(self):

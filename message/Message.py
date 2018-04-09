@@ -6,7 +6,8 @@ from store.Key import Key
 ACTION_WRITE = 1
 ACTION_RECEIVED = 2
 ACTION_REQUEST = 3
-ACTION_SNAPSHOT = 4
+ACTION_RESPONSE = 4
+ACTION_SNAPSHOT = 5
 
 DEST_LOCAL = b'0'
 DEST_BROADCAST = b'1'
@@ -17,12 +18,13 @@ class Message:
     """ Message is a key-value pair that can be marshaled and passed to other nodes
         or put into storage. """
 
-    def __init__(self, path: str, key: Key, value: bytes, action: int, dest: bytes):
+    def __init__(self, path: str, key: Key, value: bytes, action: int, dest: bytes, dest_node: bytes = None):
         self.path = path
         self.key = key
         self.value = value
         self.action = action
         self.dest = dest
+        self.dest_node = dest_node
 
     def marshall_JSON(self) -> bytes:
         return bytes(json.dumps({
@@ -30,7 +32,8 @@ class Message:
             'k': self.key.string(),
             'v': self.value,
             'a': self.action,
-            'd': self.dest
+            'd': self.dest,
+            'n': self.dest_node,
         }), 'utf-8')
 
     def unmarshall_JSON(self, b: bytes):
@@ -40,6 +43,7 @@ class Message:
         self.value = d['v']
         self.action = d['a']
         self.dest = d['d']
+        self.dest_node = d['n']
 
 def new_message(path: str, device_id: bytes, value: bytes, action: int, dest=DEST_LOCAL):
     key = Key(tim=time.time(), device_id=device_id)
