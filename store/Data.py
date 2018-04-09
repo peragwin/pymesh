@@ -1,6 +1,7 @@
 import btree
 import time
 
+CACHE_SIZE = 1024
 
 class Data:
     """ Data implements a datastore """
@@ -13,23 +14,10 @@ class Data:
         self._file = f
         self._path = store_path
 
-        db = btree.open(f)
+        db = btree.open(f, cachesize=CACHE_SIZE)
         self.db = db
 
     def close(self):
         self.db.flush()
         self.db.close()
         self._file.close()
-
-    def store(self, key: bytes, value: bytes):
-        self.db[key] = value
-
-    def load(self, key: bytes) -> bytes:
-        return self.db[key]
-
-    def delete(self, key: bytes):
-        del self.db[key]
-
-    def path(self) -> bytes:
-        return self._path
-

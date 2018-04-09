@@ -1,3 +1,3 @@
-from Node import Node
+from node.Node import Node
 
 node = Node()

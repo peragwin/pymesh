@@ -1,9 +1,35 @@
 import os
 import btree
 
+from store.Data import Data
 from store.Table import Table
+from store.util import Key
 
-MAX_OPEN_TABLES = 2
+MAX_OPEN_TABLES = 4
+
+
+class StoreV2(Data):
+    
+    def __init__(self, store_path: str):
+        self.path = store_path
+        try:
+            os.stat(self.path)
+        except OSError:
+            print("path '%s' not found; creating" % store_path)
+            os.mkdir(self.path)
+        
+        self.data = Data(self.path + '/rawdata')
+
+    def read(self, key: Key) -> bytes:
+        return self.db[key.string()]
+
+    def write(self, key: Key, value: bytes):
+        self.db[key.string()] = value
+        self.db.flush()
+
+    def latest(self, path: str) -> tuple:
+        return next( self.db.items(None, None, btree.DESC) )
+
 
 class Store:
     """ A Store is a collection of tables """
@@ -64,4 +90,7 @@ class Store:
 
     def latest(self, path: str) -> tuple:
         table = self.open_table(path)
-        return next( table.db.items(None, None, btree.DESC) )
+        try:
+            return next( table.db.items(None, None, btree.DESC) )
+        except StopIteration:
+            raise ValueError
