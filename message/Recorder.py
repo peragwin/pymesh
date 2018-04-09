@@ -12,7 +12,7 @@ class MessageRecorder(Store):
         self.node_id = node_id
         self.expiry = expiry
         self.is_uplink = is_uplink
-        self.meta = self.open_table('/meta', cache_size=4096)
+        self.meta = self.open_table('/meta', mode='w', cache_size=4096)
 
     def record(self, msg: Message):
         if msg.action == ACTION_RECEIVED:

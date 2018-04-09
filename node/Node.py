@@ -5,7 +5,7 @@ import network
 from message.Message import new_message, ACTION_WRITE, DEST_BROADCAST, DEST_LOCAL
 from message.Recorder import MessageRecorder
 from store.Store import Store
-from store.util import Key
+from store.Key import Key
 
 STORE_PATH = '/data'
 
@@ -96,11 +96,15 @@ class Node:
 
         else:
             # scan and sort by rssi
-            scan = self.sta_if.scan().sort(key=lambda s: -s[3])
+            scan = self.sta_if.scan()
+            scan.sort(key=lambda s: -s[3])
             for s in scan:
                 bssid = s[0]
                 if bssid.startswith(b'MESH-NODE'):
-                    node_id = str(bssid.split(b'-')[-1], 'utf-8')
+                    did = bssid.split(b'-')[-1]
+                    node_id = str(did, 'utf-8')
+                    if did == self.device_id:
+                        continue
                     try:
                         _, passwd = self.store.latest(path('/config', node_id, 'ap', 'passwd'))
                         self.sta_if.connect(bssid, passwd)
@@ -118,6 +122,7 @@ class Node:
                         break
 
                     except ValueError: # Config for AP not in storage
+                        print("missing password for AP", bssid)
                         pass
 
     def write_local(self, path: str, value: bytes):

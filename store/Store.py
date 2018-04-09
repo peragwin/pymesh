@@ -5,7 +5,7 @@ from store.Data import Data
 from store.Table import Table
 from store.Key import Key
 
-MAX_OPEN_TABLES = 4
+MAX_OPEN_TABLES = 2
 
 
 class StoreV2(Data):
@@ -57,8 +57,8 @@ class Store:
         
         except KeyError:
             if len(self._lr_opened_tables) >= MAX_OPEN_TABLES:
-                path = self._lr_opened_tables.pop(0)
-                self._close_table(path)
+                p = self._lr_opened_tables.pop(0)
+                self._close_table(p)
 
             table = Table(path, **kwargs)
             print("opened:", path)
@@ -89,7 +89,7 @@ class Store:
         return table.db[key]
 
     def write(self, path: str, key: bytes, value: bytes):
-        table = self.open_table(path)
+        table = self.open_table(path, mode='w')
         table.db[key] = value
         table.db.flush()
 
