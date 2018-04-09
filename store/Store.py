@@ -45,23 +45,28 @@ class Store:
         self._lr_opened_tables = []
 
     def open_table(self, pth: str) -> Table:
-        print("before prepend:", pth)
+        # print("before prepend:", pth)
         path = self.path + pth
-        print("after prepend:", path)
+        # print("after prepend:", path)
+
         try:
             table = self._open_tables[path]
-        except KeyError:
-            table = Table(path)
-            print("opened:", table.path)
+            idx = self._lr_opened_tables.index(path)
+            self._lr_opened_tables.pop(idx)
+            self._lr_opened_tables.append(path)
         
-        self._open_tables[path] = table
-        self._lr_opened_tables = [path] + self._lr_opened_tables
-        print(self._open_tables, self._lr_opened_tables)
+        except KeyError:
+            if len(self._lr_opened_tables) >= MAX_OPEN_TABLES:
+                path = self._lr_opened_tables.pop(0)
+                self._close_table(path)
 
-        if len(self._lr_opened_tables) > MAX_OPEN_TABLES:
-            path = self._lr_opened_tables.pop()
-            self._close_table(path)
+            table = Table(path)
+            print("opened:", path)
+        
+            self._open_tables[path] = table
+            self._lr_opened_tables.append(path)
 
+        # print(self._open_tables, self._lr_opened_tables)
         return table
 
     def close_table(self, pth: str):
