@@ -95,7 +95,10 @@ class Store:
 
     def latest(self, path: str) -> tuple:
         table = self.open_table(path)
-        try:
-            return next( table.db.items(None, None, btree.DESC) )
-        except StopIteration:
+        for item in table.db.items(None, None, btree.DESC):
+            return item
+        else:
             raise ValueError
+    
+    def keys(self, path: str):
+        return self.open_table(path).db.keys()

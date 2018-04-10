@@ -1,8 +1,10 @@
-import uhashlib
 import time
 import network
+import socket
+import asyncio
 
-from message.Message import new_message, ACTION_WRITE, DEST_BROADCAST, DEST_LOCAL
+from message.Message import (new_message, ACTION_WRITE, DEST_BROADCAST,
+    ACTION_RECEIVED, DEST_LOCAL, DEST_UPLINK, DEST_NODE, unmarshall_JSON)
 from message.Recorder import MessageRecorder
 from store.Store import Store
 from store.Key import Key
@@ -30,17 +32,28 @@ class Node:
         self.device_id = hexlify(ap.config('mac'))
 
         self.store = MessageRecorder(STORE_PATH, self.device_id, DEFAULT_MESSAGE_EXPIRY)
+        
+        # uplink stores the IP of the data uplink
+        try:
+            _, uplink = self.store.latest('/local/config/uplink')
+            self.uplink = str(uplink, 'utf-8')
+        except ValueError:
+            self.uplink = None
+        print("set uplink to:", self.uplink)
 
         self.configure_ap()
         self.configure_sta()
 
+        self.rtc_synced = False
         if sta.isconnected():
             # Initialize RTC to the current time
             from ntptime import settime
-            settime()
-            self.rtc_synced = True
-        else:
-            self.rtc_synced = False
+            try:
+                settime()
+                self.rtc_synced = True
+            except OSError:
+                pass
+        if not self.rtc_synced:
             print("running in limited mode until RTC is set")
 
     def configure_ap(self):
@@ -132,4 +145,71 @@ class Node:
     def write_broadcast(self, path: str, value: bytes):
         msg = new_message(path, self.device_id, value, ACTION_WRITE, DEST_BROADCAST)
         self.store.record(msg)
+
+    def listen_and_serve(self):
+        # bind to listen for incomming connections
+        addr = socket.getaddrinfo('0.0.0.0', 1337)[0][-1]
+        lis = socket.socket()
+        lis.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        lis.settimeout(10)
+        lis.bind(addr)
+        lis.listen(1)
+
+        try:
+            interval = 0
+            while True:
+                time.sleep(10 - interval)
+                start_time = time.time()
+
+                if self.uplink:
+                    parent = self.uplink
+                else:
+                    parent = self.sta_if.ifconfig()[3]
+
+                print("<<< Connecting to send messages to parent:", parent)
+                success = False
+                s = socket.socket()
+                s.settimeout(10)
+                try:
+                    s.connect(socket.getaddrinfo(parent, 1337)[0][-1])
+
+                    for key, msg in self.store.meta_table().db.items():
+                        s.send(msg + b'\r\n')
+                        print('sent message:', key)
+
+                    s.close()
+                    success = True
+                except OSError as e:
+                    print("could not connect to parent:", e)
+
+                # clear our uplink messages and record a "received" repsonse for each one
+                if success and self.uplink:
+                    for raw_msg in self.store.meta_table().db.values():
+                        print(raw_msg)
+                        msg = unmarshall_JSON(raw_msg)
+                        if (msg.dest == DEST_UPLINK):
+                            msg.action = ACTION_RECEIVED
+                            self.store.record(msg)
+
+                print("<<< Try to receive messages from parent")
+                try:
+                    cl, addr = lis.accept()
+                    print('client connected from', addr)
+                    f = cl.makefile('rb', 0, newline='\r\n')
+                    while True:
+                        line = f.readline()
+                        try:
+                            msg = unmarshall_JSON(line)
+                            self.store.record(msg)
+                        except:
+                            print('error: bad message:', line)
+
+                    cl.close()
+                except OSError:
+                    pass
+
+                interval = time.time() - start_time
+
+        finally:
+            lis.close()    
 
