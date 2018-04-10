@@ -1,7 +1,7 @@
 import time
 import network
 import socket
-import asyncio
+import uasyncio as asyncio
 
 from message.Message import (new_message, ACTION_WRITE, DEST_BROADCAST,
     ACTION_RECEIVED, DEST_LOCAL, DEST_UPLINK, DEST_NODE, unmarshall_JSON)
@@ -146,51 +146,57 @@ class Node:
         msg = new_message(path, self.device_id, value, ACTION_WRITE, DEST_BROADCAST)
         self.store.record(msg)
 
-    def listen_and_serve(self):
+    async def _send_messages(self):
+        interval = 0
+        while True:
+            await asyncio.sleep(10 - interval)
+            start_time = time.time()
+
+            if self.uplink:
+                parent = self.uplink
+            else:
+                parent = self.sta_if.ifconfig()[3]
+
+            print("<<< Connecting to send messages to parent:", parent)
+            success = False
+            s = socket.socket()
+            s.settimeout(10)
+            s.setblocking(False)
+            try:
+                s.connect(socket.getaddrinfo(parent, 1337)[0][-1])
+
+                for key, msg in self.store.meta_table().db.items():
+                    s.send(msg + b'\r\n')
+                    print('sent message:', key)
+
+                s.close()
+                success = True
+            except OSError as e:
+                print("could not connect to parent:", e)
+
+            # clear our uplink messages and record a "received" repsonse for each one
+            if success and self.uplink:
+                for raw_msg in self.store.meta_table().db.values():
+                    print(raw_msg)
+                    msg = unmarshall_JSON(raw_msg)
+                    if (msg.dest == DEST_UPLINK):
+                        msg.action = ACTION_RECEIVED
+                        self.store.record(msg)
+            
+            interval = time.time() - start_time
+
+    async def _receive_messages(self):
         # bind to listen for incomming connections
         addr = socket.getaddrinfo('0.0.0.0', 1337)[0][-1]
         lis = socket.socket()
         lis.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         lis.settimeout(10)
+        lis.setblocking(False)
         lis.bind(addr)
         lis.listen(1)
 
         try:
-            interval = 0
             while True:
-                time.sleep(10 - interval)
-                start_time = time.time()
-
-                if self.uplink:
-                    parent = self.uplink
-                else:
-                    parent = self.sta_if.ifconfig()[3]
-
-                print("<<< Connecting to send messages to parent:", parent)
-                success = False
-                s = socket.socket()
-                s.settimeout(10)
-                try:
-                    s.connect(socket.getaddrinfo(parent, 1337)[0][-1])
-
-                    for key, msg in self.store.meta_table().db.items():
-                        s.send(msg + b'\r\n')
-                        print('sent message:', key)
-
-                    s.close()
-                    success = True
-                except OSError as e:
-                    print("could not connect to parent:", e)
-
-                # clear our uplink messages and record a "received" repsonse for each one
-                if success and self.uplink:
-                    for raw_msg in self.store.meta_table().db.values():
-                        print(raw_msg)
-                        msg = unmarshall_JSON(raw_msg)
-                        if (msg.dest == DEST_UPLINK):
-                            msg.action = ACTION_RECEIVED
-                            self.store.record(msg)
-
                 print("<<< Try to receive messages from parent")
                 try:
                     cl, addr = lis.accept()
@@ -208,8 +214,11 @@ class Node:
                 except OSError:
                     pass
 
-                interval = time.time() - start_time
-
         finally:
             lis.close()    
 
+    def listen_and_serve(self):
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._send_messages())
+        loop.create_task(self._receive_messages())
+        loop.run_forever()
