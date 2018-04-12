@@ -1,7 +1,8 @@
 import time
 import network
 import socket
-import uasyncio as asyncio
+# import uasyncio as asyncio
+import _thread
 
 from message.Message import (new_message, ACTION_WRITE, DEST_BROADCAST,
     ACTION_RECEIVED, DEST_LOCAL, DEST_UPLINK, DEST_NODE, unmarshall_JSON)
@@ -22,6 +23,8 @@ class Node:
     """ Node represents a node of the network """
     def __init__(self):
 
+        self._th_recv_exit = False
+        self._th_send_exit = False
         
         self.ap_if = ap = network.WLAN(network.AP_IF)
         self.sta_if = sta = network.WLAN(network.STA_IF)
@@ -146,10 +149,14 @@ class Node:
         msg = new_message(path, self.device_id, value, ACTION_WRITE, DEST_BROADCAST)
         self.store.record(msg)
 
-    async def _send_messages(self):
+    def _send_messages(self):
         interval = 0
         while True:
-            await asyncio.sleep(10 - interval)
+            if self._th_send_exit:
+                return
+
+            #await asyncio.sleep(10 - interval)
+            time.sleep(max((10-interval, 0)))
             start_time = time.time()
 
             if self.uplink:
@@ -161,7 +168,7 @@ class Node:
             success = False
             s = socket.socket()
             s.settimeout(10)
-            s.setblocking(False)
+            #s.setblocking(False)
             try:
                 s.connect(socket.getaddrinfo(parent, 1337)[0][-1])
 
@@ -185,18 +192,21 @@ class Node:
             
             interval = time.time() - start_time
 
-    async def _receive_messages(self):
+    def _receive_messages(self):
         # bind to listen for incomming connections
         addr = socket.getaddrinfo('0.0.0.0', 1337)[0][-1]
         lis = socket.socket()
         lis.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         lis.settimeout(10)
-        lis.setblocking(False)
+        #lis.setblocking(False)
         lis.bind(addr)
         lis.listen(1)
 
         try:
             while True:
+                if self._th_recv_exit:
+                    return
+
                 print("<<< Try to receive messages from parent")
                 try:
                     cl, addr = lis.accept()
@@ -218,7 +228,14 @@ class Node:
             lis.close()    
 
     def listen_and_serve(self):
-        loop = asyncio.get_event_loop()
-        loop.create_task(self._send_messages())
-        loop.create_task(self._receive_messages())
-        loop.run_forever()
+        # loop = asyncio.get_event_loop()
+        # loop.create_task(self._send_messages())
+        # loop.create_task(self._receive_messages())
+        # loop.run_forever()
+        self._th_send = _thread.start_new_thread(self._send_messages, ())
+        self._th_recv = _thread.start_new_thread(self._receive_messages, ())
+
+    def exit(self):
+        self.store.close()
+        self._th_send_exit = True
+        self._th_recv_exit = True
