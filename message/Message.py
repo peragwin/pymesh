@@ -1,19 +1,16 @@
 import time
-import uhashlib
-from ubinascii import hexlify
 import json
+try:
+    import uhashlib as hashlib
+except ImportError:
+    import hashlib
+try:
+    from ubinascii import hexlify
+except ImportError:
+    from binascii import hexlify
+
 from store.Key import Key
-
-ACTION_WRITE = 1
-ACTION_RECEIVED = 2
-ACTION_REQUEST = 3
-ACTION_RESPONSE = 4
-ACTION_SNAPSHOT = 5
-
-DEST_LOCAL = 0
-DEST_BROADCAST = 1
-DEST_UPLINK = 2
-DEST_NODE = 3
+from message import DEST_LOCAL
 
 class Message:
     """ Message is a key-value pair that can be marshaled and passed to other nodes
@@ -27,14 +24,14 @@ class Message:
         self.dest = dest
         self.dest_node = dest_node
 
-    def marshall_JSON(self) -> bytes:
+    def json(self) -> bytes:
         return bytes(json.dumps({
             'p': self.path,
-            'k': self.key.string(),
-            'v': self.value,
+            'k': str(self.key.string(), 'utf-8'),
+            'v': str(self.value, 'utf-8'),
             'a': self.action,
             'd': self.dest,
-            'n': self.dest_node,
+            'n': str(self.dest_node, 'utf-8'),
         }), 'utf-8')
 
 def unmarshall_JSON(b: bytes) -> Message:
@@ -45,15 +42,14 @@ def unmarshall_JSON(b: bytes) -> Message:
     return Message(d['p'], key, value, d['a'], d['d'], dest_node)
 
 def new_message(path: str, device_id: bytes, value: bytes, action: int, dest=DEST_LOCAL):
-    key = Key(tim=time.time(), device_id=device_id)
+    tim = time.time()
+    key = Key(tim=tim, device_id=device_id)
     
-    sha = uhashlib.sha256()
+    sha = hashlib.sha256()
     sha.update(path)
-    sha.update(key.string())
+    sha.update(str(tim))
+    sha.update(device_id)
     sha.update(value)
     key.data_id = hexlify(sha.digest())[:8]
 
     return Message(path, key, value, action, dest)
-
-
-

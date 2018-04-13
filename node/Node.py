@@ -16,6 +16,11 @@ STORE_PATH = '/data'
 # to notice and fix a network partition. Hopefully we can make storage nodes cheap.
 DEFAULT_MESSAGE_EXPIRY = 5*24*3600
 
+DEFAULT_PASSWORD = b'CHANGEMELATER'
+
+RUN_MODE_SLEEP = b'RM_SLP'
+RUN_MODE_CONFIGURE_NETWORK = b'RM_CFG'
+
 def path(*args) -> str:
     return '/'.join(args)
 
@@ -35,13 +40,12 @@ class Node:
         self.device_id = hexlify(ap.config('mac'))
 
         self.store = MessageRecorder(STORE_PATH, self.device_id, DEFAULT_MESSAGE_EXPIRY)
-        
+
+        self.parent_node = self.read_str('/local/config/parent')
+        self.run_mode = self.read_str('/local/runmode') or RUN_MODE_CONFIGURE_NETWORK
+
         # uplink stores the IP of the data uplink
-        try:
-            _, uplink = self.store.latest('/local/config/uplink')
-            self.uplink = str(uplink, 'utf-8')
-        except ValueError:
-            self.uplink = None
+        self.uplink = self.read_str('/local/config/uplink')
         print("set uplink to:", self.uplink)
 
         self.configure_ap()
@@ -79,7 +83,7 @@ class Node:
                 _, passwd = self.store.latest(passwd_path)
             except ValueError:
                 # Finally set a default password and record it.
-                passwd = b'CHANGEMELATER'
+                passwd = DEFAULT_PASSWORD
                 self.write_broadcast(passwd_path, passwd)
 
         # TODO: set up ifconfig
@@ -93,15 +97,8 @@ class Node:
         passwd_path = path('/local', 'config', 'sta', 'passwd')
 
         if not force_scan:
-            try:   
-                _, sta_essid = self.store.latest(essid_path)
-            except:
-                pass
-
-            try:
-                _, sta_passwd = self.store.latest(passwd_path)
-            except:
-                pass
+            sta_essid = self.read(essid_path)
+            sta_passwd = self.read(passwd_path)
 
         if sta_essid and sta_passwd:
             self.sta_if.connect(sta_essid, sta_passwd)
@@ -141,19 +138,15 @@ class Node:
                         print("missing password for AP", bssid)
                         pass
 
-    def write_local(self, path: str, value: bytes):
-        msg = new_message(path, self.device_id, value, ACTION_WRITE, DEST_LOCAL)
-        self.store.record(msg)
-
-    def write_broadcast(self, path: str, value: bytes):
-        msg = new_message(path, self.device_id, value, ACTION_WRITE, DEST_BROADCAST)
-        self.store.record(msg)
-
     def _send_messages(self):
         interval = 0
         while True:
             if self._th_send_exit:
                 return
+
+            if self.run_mode == RUN_MODE_SLEEP:
+                time.sleep(10)
+                continue
 
             #await asyncio.sleep(10 - interval)
             time.sleep(max((10-interval, 0)))
@@ -189,6 +182,9 @@ class Node:
                     if (msg.dest == DEST_UPLINK):
                         msg.action = ACTION_RECEIVED
                         self.store.record(msg)
+
+            # TODO: FILTER PARENT/CHILD FORWARDING BY DEST
+            # TODO: SEND MESSAGES TO CHILDREN
             
             interval = time.time() - start_time
 
@@ -206,6 +202,10 @@ class Node:
             while True:
                 if self._th_recv_exit:
                     return
+
+                if self.run_mode == RUN_MODE_SLEEP:
+                    time.sleep(10)
+                    continue
 
                 print("<<< Try to receive messages from parent")
                 try:
