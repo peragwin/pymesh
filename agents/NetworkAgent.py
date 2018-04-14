@@ -69,8 +69,11 @@ class NetworkAgent(Agent):
                 self.send_uplink([self.node_id])
 
                 # DO THIS AFTER ALL THE NODES HAVE RECEIVED THE UPLINK MESSAGES
-                # self.write_local('/system/sta/connect', msg.value)
-                # self.parent = body['e']
+                self.schedule_after('/system/sync/parent', '/system/sta/connect', msg.value)
+                self.schedule_after('/system/sync/parent', '/system/network', {
+                    't': MESSAGE_SET_PARENT,
+                    'p': body['e']
+                })
 
             elif msg_type == MESSAGE_UPLINK:
                 print("@@@ receive uplink msg", self.node_id, body)
@@ -87,6 +90,9 @@ class NetworkAgent(Agent):
                     
 
                     # DO THIS AFTER ALL THE NODES HAVE RECEIVED THE UPLINK MESSAGES
+                    self.schedule_after('/system/sync/parent', '/system/sta/connect' {
+                        'n': from_node,
+                    })
                     # self.write_local('/system/sta/connect', json.dumps({
                     #     'n': from_node,
                     # }))

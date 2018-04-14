@@ -84,6 +84,8 @@ class StationAgent(Agent):
         self.write_local(PASSWD_PATH, passwd)
         if node_id:
             self.write_local('/system/network/parent', network_set_parent(node_id))
+        else:
+            self.write_local('/system/network/parent', network_set_parent('UPLINK'))
         self.write_local('/system/network', NETWORK_SEND_HELLO)
         return True
 

@@ -45,4 +45,8 @@ class Client:
         msg = new_message(path, self.node_id, value, ACTION_WRITE, DEST_NEIGHBORS)
         print("@@@ record msg for neighbors", msg.json())
         self.broker.record(msg, notify_agents=False, force_record_meta=True)
+
+    def schedule_after(self, event_path: str, path: str, value: dict, action=ACTION_WRITE, dest=DEST_LOCAL):
+        """ Schedules a message to be sent after an event trigger has completed """
+        self.broker.schedule_after(event_path, new_message(path, self.node_id, value, action, dest))
  
