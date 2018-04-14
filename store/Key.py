@@ -6,7 +6,10 @@ def fmt_time(t: int) -> bytes:
 
 def parse_time(t: bytes) -> int:
     tt = tuple(int(v) for v in t.split(b'-'))
-    return time.mktime(tt[:6] + (0,0))
+    try:
+        return time.mktime(tt[:6] + (0,0))
+    except:
+        return time.mktime(tt[:6] + (0,0,0))
 
 class Key:
     time = 0

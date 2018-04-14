@@ -5,7 +5,7 @@ from store.Data import Data
 from store.Table import Table
 from store.Key import Key
 
-MAX_OPEN_TABLES = 2
+MAX_OPEN_TABLES = 8
 
 
 class StoreV2(Data):
@@ -61,7 +61,7 @@ class Store:
                 self._close_table(p)
 
             table = Table(path, **kwargs)
-            print("opened:", path)
+            #print("opened:", path)
         
             self._open_tables[path] = table
             self._lr_opened_tables.append(path)

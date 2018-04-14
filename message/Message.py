@@ -16,7 +16,7 @@ class Message:
     """ Message is a key-value pair that can be marshaled and passed to other nodes
         or put into storage. """
 
-    def __init__(self, path: str, key: Key, value: bytes, action: int, dest: int, dest_node: bytes = b''):
+    def __init__(self, path: str, key: bytes, value: bytes, action: int, dest: int, dest_node: bytes = b''):
         self.path = path
         self.key = key
         self.value = value
@@ -27,7 +27,7 @@ class Message:
     def json(self) -> bytes:
         return bytes(json.dumps({
             'p': self.path,
-            'k': str(self.key.string(), 'utf-8'),
+            'k': str(self.key, 'utf-8'),
             'v': str(self.value, 'utf-8'),
             'a': self.action,
             'd': self.dest,
@@ -36,7 +36,7 @@ class Message:
 
 def unmarshall_JSON(b: bytes) -> Message:
     d = json.loads(str(b, 'utf-8'))
-    key = Key(bytes(d['k'], 'utf-8'))
+    key = bytes(d['k'], 'utf-8')
     value = bytes(d['v'], 'utf-8')
     dest_node = bytes(d['n'], 'utf-8')
     return Message(d['p'], key, value, d['a'], d['d'], dest_node)
@@ -52,4 +52,4 @@ def new_message(path: str, device_id: bytes, value: bytes, action: int, dest=DES
     sha.update(value)
     key.data_id = hexlify(sha.digest())[:8]
 
-    return Message(path, key, value, action, dest)
+    return Message(path, key.string(), value, action, dest)
