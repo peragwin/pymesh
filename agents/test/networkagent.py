@@ -52,35 +52,64 @@ class Node:
 nodes = [Node(node) for node in network.NODES]
 nodeMap = {node.node.node_id:node for node in nodes}
 
+def sync_nodes(node_a: str, node_b: str, direction: int):
+    from_node = nodeMap[node_a]
+    to_node = nodeMap[node_b]
+    for key, raw_msg in from_node.broker.messages_to_send(direction):
+        if key not in to_node.broker.meta_table().db:
+            to_node.broker.record_raw(raw_msg)
+            from_node.broker.message_was_sent(key)
+
+class SyncAgent(Agent):
+    path = '/system/sync'
+
+    def handler(self, msg: Message):
+        if msg.path == '/system/sync/parent':
+            parent = msg.value['p']
+            if not parent:
+                return
+            sync_nodes(self.node_id, parent, SEND_TO_PARENT)
+
+        elif msg.path == '/system/sync/child':
+            child = msg.value['c']
+            sync_nodes(self.node_id, child, SEND_TO_CHILD)
+
+for node in nodes:
+    node.sync_agent = SyncAgent(node.broker)
+
 def exchange_messages() -> bool:
     exchanged = False
     for node in nodes:
         if not node.net_agent.parent or node.net_agent.parent not in nodeMap:
+            node.net_agent.write_local('/system/sync/parent', {'p': None})
             continue
-        parent_node = nodeMap[node.net_agent.parent]
+        parent_node = nodeMap[node.net_agent.parent].node.node_id
         print("--> Sync %s with %s" % (node.node.node_id, node.net_agent.parent))
 
-        for key, raw_msg in node.broker.messages_to_send(dir=SEND_TO_PARENT):
-            if key not in parent_node.broker.meta_table().db:
+
+        for key, _ in node.broker.messages_to_send(dir=SEND_TO_PARENT):
+            if key not in nodeMap[parent_node].broker.meta_table().db:
                 exchanged = True
                 print("exchanged", key)
-                parent_node.broker.record_raw(raw_msg)
-                node.broker.message_was_sent(key)
             # else:
             #     print("msg already shared with parent:", key)
+        node.net_agent.write_local('/system/sync/parent', {'p': parent_node})
 
-        for key, raw_msg in parent_node.broker.messages_to_send(dir=SEND_TO_CHILD):
+
+
+        for key, _ in nodeMap[parent_node].broker.messages_to_send(dir=SEND_TO_CHILD):
             if key not in node.broker.meta_table().db:
                 exchanged = True
                 print("exchanged", key)
-                node.broker.record_raw(raw_msg)
-                parent_node.broker.message_was_sent(key)
             # else:
-            #     print("msg already shared to childred:", key)
+            #     print("msg already shared to child:", key)
+        nodeMap[parent_node].net_agent.write_local('/system/sync/child', {'c': node.node.node_id})
 
     return exchanged
 
 show_logs()
+
+import micropython as mp
 
 lastParentMap = {}
 for i in range(2*len(nodes)):
@@ -88,6 +117,7 @@ for i in range(2*len(nodes)):
     #show_logs()
     parentMap = {node.node.node_id:node.net_agent.parent for node in nodes}
     print("PARENT MAP:", parentMap)
+    mp.mem_info()
     if parentMap == lastParentMap and any(v == '' for v in parentMap.values()):
         print("SUCCESS after %d rounds!" % i)
         break
@@ -96,12 +126,13 @@ else:
     assert False, "FAILED :("
 
 #show_logs()
+# assert False, 'DONE'
 
-nodes[0].net_agent.write_local('/system/network', json.dumps({
+nodes[0].net_agent.write_local('/system/network', {
     't': MESSAGE_SET_UPLINK,
     'e': 'UPINK-STATION',
     'p': 'test123',
-}))
+})
 
 # lastParentMap = {}
 i = 0
@@ -119,7 +150,12 @@ while exchange_messages():
 #     lastParentMap = parentMap
 # else:
 #     assert False, "FAILED :("
+
+#show_logs()
+
 print("DONE after %d rounds" % i)
 for node in nodes:
     print("hop count:", node.node.node_id, node.net_agent.hop_count)
-#show_logs()
+print(parentMap)
+
+print("log size:", len(log))

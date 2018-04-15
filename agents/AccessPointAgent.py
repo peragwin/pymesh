@@ -9,7 +9,7 @@ from message import Broker
 from message import ACTION_WRITE
 from message.Message import Message
 
-DEFAULT_PASSWORD = b'CHANGEMELATER'
+DEFAULT_PASSWORD = 'CHANGEMELATER'
 
 class AccessPointAgent(Agent):
     """ AccessPointAgent manages the WLAN adapter in AP mode """
@@ -27,7 +27,7 @@ class AccessPointAgent(Agent):
     def handler(self, msg: Message):
         if msg.action == ACTION_WRITE:
             if msg.path == self.path + '/reconfigure':
-                d = json.loads(str(msg.value, 'utf-8'))
+                d = msg.value
                 essid = d.get('e', '')
                 passwd = d.get('p', '')
                 self.reconfigure(essid, passwd)
@@ -38,7 +38,7 @@ class AccessPointAgent(Agent):
         essid_path = '/config/'+did+'/ap/essid'
         self.essid = essid = self.read(essid_path)
         if not essid:
-            essid = b'MESH-NODE-'+self.node_id
+            essid = 'MESH-NODE-'+did
             self.write_local(essid_path, essid)
         
         passwd_path = '/config/'+did+'/ap/passwd'
@@ -47,9 +47,9 @@ class AccessPointAgent(Agent):
             passwd = DEFAULT_PASSWORD
             self.write_broadcast(passwd_path, passwd)
 
-        self.ap_if.config(essid=essid, passwd=passwd)
+        self.ap_if.config(essid=bytes(essid, 'utf-8'), passwd=bytes(passwd, 'utf-8'))
 
     def reconfigure(self, essid: str, passwd: str):
         essid = essid or self.essid
         passwd = passwd or self.passwd
-        self.ap_if.config(essid=essid, passwd=passwd)
+        self.ap_if.config(essid=bytes(essid, 'utf-8'), passwd=bytes(passwd, 'utf-8'))

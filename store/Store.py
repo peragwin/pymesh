@@ -1,5 +1,6 @@
 import os
 import btree
+import json
 
 from store.Data import Data
 from store.Table import Table
@@ -86,17 +87,17 @@ class Store:
 
     def read(self, path: str, key: bytes) -> bytes:
         table = self.open_table(path)
-        return table.db[key]
+        return json.loads(table.db[key])
 
     def write(self, path: str, key: bytes, value: bytes):
         table = self.open_table(path, mode='w')
-        table.db[key] = value
-        table.db.flush()
+        table.db[key] = json.dumps(value)
+        # table.db.flush()
 
     def latest(self, path: str) -> tuple:
         table = self.open_table(path)
-        for item in table.db.items(None, None, btree.DESC):
-            return item
+        for key, value in table.db.items(None, None, btree.DESC):
+            return (key, json.loads(value))
         else:
             raise ValueError
     

@@ -3,12 +3,12 @@ import time
 from store.Key import Key
 from store.Store import Store
 from store.Table import Table
-from message.Message import Message, unmarshall_JSON
+from message.Message import Message, message_from_dict, unmarshall_JSON
 from message import (ACTION_RECEIVED, ACTION_WRITE, ACTION_REQUEST,
     ACTION_RESPONSE, DEST_LOCAL, DEST_UPLINK, DEST_NODE, DEST_PARENT,
     SEND_TO_PARENT,SEND_TO_CHILD, DEST_CHILD, DEST_NEIGHBORS)
 from message.Agent import Agent
-
+from message.EventHandler import EventHandler, EVENT_AFTER_HANDLER, EVENT_BEFORE_HANDLER
 
 
 class Broker(Store):
@@ -19,6 +19,7 @@ class Broker(Store):
         self.expiry = expiry
         self.is_uplink = is_uplink
         self.subscriptions = {}
+        self.event_handlers = {}
     
     def meta_table(self) -> Table:
         return self.open_table('/meta', mode='w')
@@ -71,7 +72,7 @@ class Broker(Store):
             self.notify_agents(msg)
 
     def _record_meta(self, msg: Message):
-        self.write('/meta', msg.key, msg.json())
+        self.write('/meta', msg.key, msg.to_dict())
 
     def record_raw(self, msg: bytes):
         self.record(unmarshall_JSON(str(msg, 'utf-8')))
@@ -79,8 +80,22 @@ class Broker(Store):
     def notify_agents(self, msg: Message):
         for path, handlers in self.subscriptions.items():
             if msg.path.startswith(path):
+                event_handlers = self.event_handlers.get(msg.path, [])
+                # if event_handlers:
+                #     assert False, event_handlers
+                for ev in event_handlers:
+                    if ev.when == EVENT_BEFORE_HANDLER:
+                        self.record(ev.msg, ev.force_record_meta, ev.notify_agents)
+
                 for handler in handlers:
                     handler(msg)
+
+                for ev in event_handlers:
+                    if ev.when == EVENT_AFTER_HANDLER:
+                        self.record(ev.msg, ev.force_record_meta, ev.notify_agents)
+
+                if event_handlers:
+                    del self.event_handlers[msg.path]
 
     def register(self, path: str, handler):
         handlers = self.subscriptions.get(path, [])
@@ -94,12 +109,26 @@ class Broker(Store):
                 continue
             if msg.dest == DEST_CHILD and dir == SEND_TO_PARENT:
                 continue
-            yield (key, raw_msg)
+            yield (key, msg.json())
 
     def message_was_sent(self, key: bytes):
         msg = unmarshall_JSON(self.meta_table().db[key])
         if msg.dest == DEST_PARENT or msg.dest == DEST_CHILD:
             del self.meta_table().db[key]
+
+    def schedule_after(self, event_path: str, msg: Message, force_record_meta=False, notify_agents=True):
+        ev = EventHandler(msg, EVENT_AFTER_HANDLER, force_record_meta, notify_agents)
+        self._schedule(event_path, ev)
+
+    def _schedule(self, event_path: str, event: EventHandler):
+        handlers = self.event_handlers.get(event_path, [])
+        handlers.append(event)
+        self.event_handlers[event_path] = handlers
+        print("Scheduled:", self.event_handlers)
+
+    def schedule_before(self, event_path: str, msg: Message, force_record_meta=False, notify_agents=True):
+        ev = EventHandler(msg, EVENT_BEFORE_HANDLER, force_record_meta, notify_agents)
+        self._schedule(event_path, ev)
 
     # def prune_messages(self):
     #     """ prune messages after the expiry """

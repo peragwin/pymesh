@@ -19,8 +19,8 @@ class NodeGroup:
         ax, ay = a.coord
         bx, by = b.coord
 
-        d = ((ax-bx)**2 + (ay-by)**2)**.5
-        return -d
+        d = ((ax-bx)**2 + (ay-by)**2)
+        return -(20+d)
 
 NODES = [
     Node('a', 0, 0),
@@ -30,8 +30,8 @@ NODES = [
     Node('e', 5, 5),
     Node('f', 4, 6),
     Node('g', 7, 7),
-    Node('h', 3, 8),
-    Node('i', 10,10),
+    # Node('h', 3, 8),
+    # Node('i', 10,10),
 ]
 
 NODE_GROUP = NodeGroup(NODES)

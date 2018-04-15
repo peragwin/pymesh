@@ -16,6 +16,9 @@ PASSWD_PATH = '/system/sta/passwd'
 RECONFIGURE_PATH = '/system/sta/reconfigure'
 CONNECT_PATH = '/system/sta/connect'
 
+RECONFIG_AVOID_CYCLE = 0
+RECONFIG_PARENT = 1
+
 class StationAgent(Agent):
     """ StationAgent controls the operation of the WLAN in STA mode """
     
@@ -35,11 +38,12 @@ class StationAgent(Agent):
     def handler(self, msg: Message):
         if msg.action == ACTION_WRITE:
             if msg.path == RECONFIGURE_PATH:
-                hops = json.loads(str(msg.value, 'utf-8'))
-                self.reconfigure(hops)
+                hops = msg.value['h']
+                flag = msg.value['f']
+                self.reconfigure(hops, flag)
 
             if msg.path == CONNECT_PATH:
-                d = json.loads(str(msg.value, 'utf-8'))
+                d = msg.value
                 node_id = d.get('n', '')
                 if node_id:
                     essid = self.read('/config/'+node_id+'/ap/essid')
@@ -65,12 +69,13 @@ class StationAgent(Agent):
             node_id = str(did, 'utf-8')
             if node_id == self.node_id:
                 continue
-            ret.append((bssid, node_id))
+            ret.append((bssid, node_id, s[3]))
         return ret
 
     def connect(self, bssid: bytes, node_id: str = '', passwd: bytes = b''):
         if not passwd:
-            passwd = self.read('/config/' + node_id + '/ap/passwd') or b'CHANGEMELATER'
+            passwd = self.read('/config/' + node_id + '/ap/passwd') or 'CHANGEMELATER'
+            passwd = bytes(passwd, 'utf-8')
 
         self.sta_if.connect(bssid, passwd)
         for _ in range(10):
@@ -80,8 +85,8 @@ class StationAgent(Agent):
         else:
             return False
 
-        self.write_local(ESSID_PATH, bssid)
-        self.write_local(PASSWD_PATH, passwd)
+        self.write_local(ESSID_PATH, str(bssid, 'utf-8'))
+        self.write_local(PASSWD_PATH, str(passwd, 'utf-8'))
         if node_id:
             self.write_local('/system/network/parent', network_set_parent(node_id))
         else:
@@ -106,19 +111,32 @@ class StationAgent(Agent):
 
         else:
             scan = self.scan()
-            for bssid, node_id in scan:
+            for bssid, node_id, _ in scan:
                 if self.connect(bssid, node_id=node_id):
                     return
 
-    def reconfigure(self, hops: list):
-        hopSet = {h:1 for h in hops}
+    def reconfigure(self, hops: list, flag: int):
+        hopSet = {h:(i+1) for i, h in enumerate(hops)}
         nodes = self.scan()
-        for bssid, node_id in nodes:
-            print(node_id, "in", hopSet)
-            if node_id in hopSet:
-                continue
 
-            if self.connect(bssid, node_id=node_id):
-                return
-        else:
-            self.disconnect()
+        if flag == RECONFIG_AVOID_CYCLE:
+            for bssid, node_id, _ in nodes:
+                print(node_id, "in", hopSet)
+
+                if node_id in hopSet:
+                    continue
+
+                if self.connect(bssid, node_id=node_id):
+                    return
+            else:
+                self.disconnect()
+
+        if flag == RECONFIG_PARENT:
+            nodes = [node for node in nodes if node[1] in hopSet]
+            nodes.sort(key=lambda n: -(hopSet[n[1]]) * n[2])
+            print(self.node_id, "sorted by hops*rssi", [n + ((hopSet[n[1]]) * n[2],) for n in nodes])
+            for bssid, node_id, _ in nodes:
+                if self.connect(bssid, node_id=node_id):
+                    return
+            else:
+                self.disconnect()

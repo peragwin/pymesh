@@ -5,7 +5,7 @@ from message.Message import Message, new_message
 from message import ACTION_WRITE
 from message import Broker
 
-from agents.StationAgent import StationAgent
+from agents.StationAgent import StationAgent, RECONFIG_PARENT, RECONFIG_AVOID_CYCLE
 from agents.AccessPointAgent import AccessPointAgent
 
 from agents import (MESSAGE_HELLO, MESSAGE_SEND_HELLO, MESSAGE_SET_PARENT,
@@ -26,24 +26,31 @@ class NetworkAgent(Agent):
         self.station_agent = StationAgent(broker)
 
     def send_hello(self, hops: list):
-        body = bytes(json.dumps({
+        # body = bytes(json.dumps({
+        #     't': MESSAGE_HELLO,
+        #     'h': hops,
+        # }), 'utf-8')
+        self.write_parent('/system/network', {
             't': MESSAGE_HELLO,
             'h': hops,
-        }), 'utf-8')
-        self.write_parent('/system/network', body)
+        })
 
     def send_uplink(self, hops: list):
-        body = bytes(json.dumps({
+        # body = bytes(json.dumps({
+        #     't': MESSAGE_UPLINK,
+        #     'h': hops,
+        # }), 'utf-8')
+        self.write_neighbors('/system/network', {
             't': MESSAGE_UPLINK,
             'h': hops,
-        }), 'utf-8')
-        self.write_neighbors('/system/network', body)
+        })
 
     def handler(self, msg: Message):
         node_id = self.node_id
         if msg.action == ACTION_WRITE:
             print("net agent handler:", msg.value)
-            body = json.loads(str(msg.value, 'utf-8'))
+            # body = json.loads(str(msg.value, 'utf-8'))
+            body = msg.value
             msg_type = body['t']
 
             if msg_type == MESSAGE_HELLO:
@@ -51,7 +58,10 @@ class NetworkAgent(Agent):
 
                 if self.parent in hops:
                     print("@@@ Cycle Detected on '%s'->'%s', reconfiguring..." % (node_id, self.parent))
-                    self.write_local('/system/sta/reconfigure', json.dumps(hops))
+                    self.write_local('/system/sta/reconfigure', {
+                        'h': hops,
+                        'f': RECONFIG_AVOID_CYCLE,
+                    })
 
                 else:
                     hops.append(node_id)
@@ -70,10 +80,10 @@ class NetworkAgent(Agent):
 
                 # DO THIS AFTER ALL THE NODES HAVE RECEIVED THE UPLINK MESSAGES
                 self.schedule_after('/system/sync/parent', '/system/sta/connect', msg.value)
-                self.schedule_after('/system/sync/parent', '/system/network', {
-                    't': MESSAGE_SET_PARENT,
-                    'p': body['e']
-                })
+                # self.schedule_after('/system/sync/parent', '/system/network', {
+                #     't': MESSAGE_SET_PARENT,
+                #     'p': body['e']
+                # })
 
             elif msg_type == MESSAGE_UPLINK:
                 print("@@@ receive uplink msg", self.node_id, body)
@@ -82,17 +92,14 @@ class NetworkAgent(Agent):
 
                 if hop_count < self.hop_count:
                     self.hop_count = hop_count
-                    from_node = hops[-1]
                     hops.append(self.node_id)
                     self.send_uplink(hops)
-                else:
-                    print("@@@ ignored message")
-                    
 
                     # DO THIS AFTER ALL THE NODES HAVE RECEIVED THE UPLINK MESSAGES
-                    self.schedule_after('/system/sync/parent', '/system/sta/connect' {
-                        'n': from_node,
+                    self.schedule_after('/system/sync/parent', '/system/sta/reconfigure', {
+                        'h': hops,
+                        'f': RECONFIG_PARENT,
                     })
-                    # self.write_local('/system/sta/connect', json.dumps({
-                    #     'n': from_node,
-                    # }))
+                else:
+                    print("@@@ ignored uplink message", self.node_id, self.hop_count, hop_count)
+                    
