@@ -9,7 +9,7 @@ from message.Agent import Agent
 from message import Broker
 from message import ACTION_WRITE
 from message.Message import Message
-from agents import NETWORK_SEND_HELLO, network_set_parent
+from agents import NETWORK_SEND_HELLO, network_set_parent, SYSTEM_HOPS_PATH
 
 ESSID_PATH = '/system/sta/essid'
 PASSWD_PATH = '/system/sta/passwd'
@@ -38,7 +38,7 @@ class StationAgent(Agent):
     def handler(self, msg: Message):
         if msg.action == ACTION_WRITE:
             if msg.path == RECONFIGURE_PATH:
-                hops = msg.value['h']
+                hops = msg.value.get('h', None)
                 flag = msg.value['f']
                 self.reconfigure(hops, flag)
 
@@ -46,8 +46,8 @@ class StationAgent(Agent):
                 d = msg.value
                 node_id = d.get('n', '')
                 if node_id:
-                    essid = self.read('/config/'+node_id+'/ap/essid')
-                    passwd = self.read('/config/'+node_id+'/ap/passwd')
+                    essid = self.read('/config/ap/essid/' + node_id)
+                    passwd = self.read('/config/ap/passwd/' + node_id)
                 else:
                     essid = d.get('e', '')
                     passwd = d.get('p', '')
@@ -74,7 +74,7 @@ class StationAgent(Agent):
 
     def connect(self, bssid: bytes, node_id: str = '', passwd: bytes = b''):
         if not passwd:
-            passwd = self.read('/config/' + node_id + '/ap/passwd') or 'CHANGEMELATER'
+            passwd = self.read('/config/ap/passwd/'+node_id) or 'CHANGEMELATER'
             passwd = bytes(passwd, 'utf-8')
 
         self.sta_if.connect(bssid, passwd)
@@ -116,7 +116,8 @@ class StationAgent(Agent):
                     return
 
     def reconfigure(self, hops: list, flag: int):
-        hopSet = {h:(i+1) for i, h in enumerate(hops)}
+        hopSet = {h:(i+1) for i, h in enumerate(hops)} if hops else (
+            {k:(v+1) for k, v in (self.read(SYSTEM_HOPS_PATH) or {}).items()})
         nodes = self.scan()
 
         if flag == RECONFIG_AVOID_CYCLE:

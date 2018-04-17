@@ -1,10 +1,13 @@
-from node.Node import Node
+#from node.Node import Node
 import micropython
 
-node = Node()
+from board.proto0 import ProtoBoard
+pb = ProtoBoard()
 
-node.write_broadcast('/test', b'hello from the other side')
+# node = Node()
+
+# node.write_broadcast('/test', b'hello from the other side')
 
 micropython.mem_info()
 
-node.listen_and_serve()
+# node.listen_and_serve()

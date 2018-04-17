@@ -9,7 +9,9 @@ from agents.StationAgent import StationAgent, RECONFIG_PARENT, RECONFIG_AVOID_CY
 from agents.AccessPointAgent import AccessPointAgent
 
 from agents import (MESSAGE_HELLO, MESSAGE_SEND_HELLO, MESSAGE_SET_PARENT,
-    MESSAGE_UPLINK, MESSAGE_SET_UPLINK)
+    MESSAGE_UPLINK, MESSAGE_SET_UPLINK, CONFIG_HOPS_PATH)
+from agents import bcolors
+
 
 class NetworkAgent(Agent):
     """ ConfigAgent listens for messages at the /system path and is used
@@ -51,13 +53,13 @@ class NetworkAgent(Agent):
             print("net agent handler:", msg.value)
             # body = json.loads(str(msg.value, 'utf-8'))
             body = msg.value
-            msg_type = body['t']
+            msg_type = body.get('t', None)
 
             if msg_type == MESSAGE_HELLO:
                 hops = body['h']
 
                 if self.parent in hops:
-                    print("@@@ Cycle Detected on '%s'->'%s', reconfiguring..." % (node_id, self.parent))
+                    print(bcolors.WARNING, "@@@ Cycle Detected on '%s'->'%s', reconfiguring..." % (node_id, self.parent), bcolors.ENDC)
                     self.write_local('/system/sta/reconfigure', {
                         'h': hops,
                         'f': RECONFIG_AVOID_CYCLE,
@@ -76,6 +78,7 @@ class NetworkAgent(Agent):
             elif msg_type == MESSAGE_SET_UPLINK:
                 self.hop_count = 0
                 print('@@@ send uplink')
+                self.write_broadcast(CONFIG_HOPS_PATH, 0)
                 self.send_uplink([self.node_id])
 
                 # DO THIS AFTER ALL THE NODES HAVE RECEIVED THE UPLINK MESSAGES
@@ -92,14 +95,14 @@ class NetworkAgent(Agent):
 
                 if hop_count < self.hop_count:
                     self.hop_count = hop_count
+                    self.write_broadcast(CONFIG_HOPS_PATH, hop_count)
                     hops.append(self.node_id)
                     self.send_uplink(hops)
 
                     # DO THIS AFTER ALL THE NODES HAVE RECEIVED THE UPLINK MESSAGES
                     self.schedule_after('/system/sync/parent', '/system/sta/reconfigure', {
-                        'h': hops,
+                        # 'h': hops,
                         'f': RECONFIG_PARENT,
                     })
                 else:
                     print("@@@ ignored uplink message", self.node_id, self.hop_count, hop_count)
-                    

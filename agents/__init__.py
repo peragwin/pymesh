@@ -17,4 +17,17 @@ def network_set_parent(parent: str):
     #     'p': parent,
     # }), 'utf-8')
 
+CONFIG_HOPS_PATH = '/config/network/hops'
+SYSTEM_HOPS_PATH = '/system/network/hops'
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+
 from agents.NetworkAgent import NetworkAgent
+

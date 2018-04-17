@@ -1,27 +1,29 @@
 import time
 
-def fmt_time(t: int) -> bytes:
-    tt = time.localtime(t)
-    return bytes('-'.join(str(v) for v in tt[:6]), 'utf-8')
+def fmt_time(t: int) -> str:
+    tt = time.localtime(t)[:6] + ('%d' % (1000*(t % 1)),)
+    return '-'.join(str(v) for v in tt)
 
-def parse_time(t: bytes) -> int:
-    tt = tuple(int(v) for v in t.split(b'-'))
+def parse_time(t: str) -> int:
+    tt = tuple(int(v) for v in t.split('-'))
     try:
-        return time.mktime(tt[:6] + (0,0))
+        return time.mktime(tt[:6] + (0,0)) + (tt[6] / 1000)
     except:
-        return time.mktime(tt[:6] + (0,0,0))
+        return time.mktime(tt[:6] + (0,0,0)) + (tt[6] / 1000)
 
 class Key:
     time = 0
-    device_id = b''
-    data_id = b''
+    device_id = ''
+    data_id = ''
 
-    def __init__(self, k: bytes = b'', tim=0, device_id=b'', data_id=b''):
+    def __init__(self, k: str = '', tim=0, device_id='', data_id=''):
         if k:
-            t, p, d = k.split(b':')
+            if isinstance(k, bytes):
+                k = str(k, 'utf-8')
+            t, p, d = k.split(':')
             self.time = parse_time(t)
-            self.device_id = p
-            self.data_id = d
+            self.device_id = str(p, 'utf-8')
+            self.data_id = str(d, 'utf-8')
         else:
             self.time = tim
             self.device_id = device_id
@@ -30,7 +32,7 @@ class Key:
 
     def string(self):
         t = fmt_time(self.time)
-        return t + b':' + self.device_id + b':' + self.data_id
+        return ':'.join((t, self.device_id, self.data_id))
 
 
 class Path:

@@ -35,13 +35,13 @@ class AccessPointAgent(Agent):
 
     def configure(self):
         did = str(self.node_id, 'utf-8')
-        essid_path = '/config/'+did+'/ap/essid'
+        essid_path = '/config/ap/essid/'+did
         self.essid = essid = self.read(essid_path)
         if not essid:
             essid = 'MESH-NODE-'+did
             self.write_local(essid_path, essid)
         
-        passwd_path = '/config/'+did+'/ap/passwd'
+        passwd_path = '/config/ap/passwd/'+did
         self.passwd = passwd = self.read(passwd_path)
         if not passwd:
             passwd = DEFAULT_PASSWORD

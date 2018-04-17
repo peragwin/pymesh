@@ -3,7 +3,8 @@ import json
 
 import agents.test.network as network
 from agents.NetworkAgent import NetworkAgent
-from agents import MESSAGE_SET_UPLINK
+from agents.ConfigAgent import ConfigAgent
+from agents import MESSAGE_SET_UPLINK, MESSAGE_UPLINK
 
 from message import Broker
 from message import SEND_TO_CHILD, SEND_TO_PARENT
@@ -23,9 +24,9 @@ def show_logs():
 
 class LogAgent(Agent):
     path = '/'
-    def __init__(self, node_id: str, broker: Broker):
+    def __init__(self, broker: Broker):
         super().__init__(broker)
-        self.node_id = node_id
+        self.node_id = broker.node_id
 
     def handler(self, msg: Message):
         log.append((self.node_id, msg))
@@ -45,7 +46,8 @@ class Node:
             os.system('rm -rf '+path)
         
         self.broker = broker = Broker(path, node.node_id, 30)
-        self.log_agent = LogAgent(node.node_id, broker)
+        self.log_agent = LogAgent(broker)
+        self.config_agent = ConfigAgent(broker)
 
         self.net_agent = NetworkAgent(broker)
 
@@ -87,20 +89,20 @@ def exchange_messages() -> bool:
         print("--> Sync %s with %s" % (node.node.node_id, node.net_agent.parent))
 
 
-        for key, _ in node.broker.messages_to_send(dir=SEND_TO_PARENT):
+        for key, raw_msg in node.broker.messages_to_send(dir=SEND_TO_PARENT):
             if key not in nodeMap[parent_node].broker.meta_table().db:
                 exchanged = True
-                print("exchanged", key)
+                print("exchanged", key, raw_msg)
             # else:
             #     print("msg already shared with parent:", key)
         node.net_agent.write_local('/system/sync/parent', {'p': parent_node})
 
 
 
-        for key, _ in nodeMap[parent_node].broker.messages_to_send(dir=SEND_TO_CHILD):
+        for key, raw_msg in nodeMap[parent_node].broker.messages_to_send(dir=SEND_TO_CHILD):
             if key not in node.broker.meta_table().db:
                 exchanged = True
-                print("exchanged", key)
+                print("exchanged", key, raw_msg)
             # else:
             #     print("msg already shared to child:", key)
         nodeMap[parent_node].net_agent.write_local('/system/sync/child', {'c': node.node.node_id})
@@ -111,16 +113,28 @@ show_logs()
 
 import micropython as mp
 
+nodes[0].net_agent.write_local('/system/network', {
+    't': MESSAGE_SET_UPLINK,
+    'e': 'UPINK-STATION',
+    'p': 'test123',
+})
+
 lastParentMap = {}
 for i in range(2*len(nodes)):
     exchange_messages()
     #show_logs()
     parentMap = {node.node.node_id:node.net_agent.parent for node in nodes}
     print("PARENT MAP:", parentMap)
-    mp.mem_info()
-    if parentMap == lastParentMap and any(v == '' for v in parentMap.values()):
-        print("SUCCESS after %d rounds!" % i)
-        break
+    #mp.mem_info()
+    if parentMap == lastParentMap and any(v in ['', 'UPLINK'] for v in parentMap.values()):
+        if list(parentMap.values()).count('') > 1:
+            for node, p in parentMap.items():
+                if not p:
+                    nodeMap[node].net_agent.station_agent.configure()
+                    break
+        else:
+            print("SUCCESS after %d rounds!" % i)
+            break
     lastParentMap = parentMap
 else:
     assert False, "FAILED :("
@@ -128,11 +142,11 @@ else:
 #show_logs()
 # assert False, 'DONE'
 
-nodes[0].net_agent.write_local('/system/network', {
-    't': MESSAGE_SET_UPLINK,
-    'e': 'UPINK-STATION',
-    'p': 'test123',
-})
+# nodes[0].net_agent.write_local('/system/network', {
+#     't': MESSAGE_SET_UPLINK,
+#     'e': 'UPINK-STATION',
+#     'p': 'test123',
+# })
 
 # lastParentMap = {}
 i = 0
@@ -159,3 +173,23 @@ for node in nodes:
 print(parentMap)
 
 print("log size:", len(log))
+# print("node A logs:")
+# for lg in (l[1] for l in log if l[0] == 'a'):
+#     print(lg.to_dict())
+# for node in nodes:
+#     print(node.node.node_id, "meta table")
+#     for i in node.broker.meta_table().db.items():
+#         print('\t'+str(i))
+#     break
+
+nodes[0].net_agent.send_uplink([])
+i = 0
+while exchange_messages():
+    #show_logs()
+    parentMap = {node.node.node_id:node.net_agent.parent for node in nodes}
+    print("PARENT MAP:", parentMap)
+    i += 1
+    if i == 5:
+        break
+    
+print("DONE after %d rounds" % i)

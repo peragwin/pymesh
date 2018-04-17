@@ -63,6 +63,6 @@ def new_message(path: str, device_id: bytes, value: bytes, action: int, dest=DES
     sha.update(str(tim))
     sha.update(device_id)
     sha.update(str(value))
-    key.data_id = hexlify(sha.digest())[:8]
+    key.data_id = str(hexlify(sha.digest())[:8], 'utf-8')
 
     return Message(path, key.string(), value, action, dest)

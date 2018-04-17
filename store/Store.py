@@ -97,7 +97,8 @@ class Store:
     def latest(self, path: str) -> tuple:
         table = self.open_table(path)
         for key, value in table.db.items(None, None, btree.DESC):
-            return (key, json.loads(value))
+            s = str(value, 'utf-8')
+            return (key, json.loads(s))
         else:
             raise ValueError
     

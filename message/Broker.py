@@ -13,7 +13,7 @@ from message.EventHandler import EventHandler, EVENT_AFTER_HANDLER, EVENT_BEFORE
 
 class Broker(Store):
 
-    def __init__(self, store_path: str, node_id: bytes, expiry: int, is_uplink=False):
+    def __init__(self, store_path: str, node_id: str, expiry: int, is_uplink=False):
         super().__init__(store_path)
         self.node_id = node_id
         self.expiry = expiry
@@ -92,6 +92,7 @@ class Broker(Store):
 
                 for ev in event_handlers:
                     if ev.when == EVENT_AFTER_HANDLER:
+                        print("@@@ exec event for", path, msg.path)
                         self.record(ev.msg, ev.force_record_meta, ev.notify_agents)
 
                 if event_handlers:
@@ -124,7 +125,7 @@ class Broker(Store):
         handlers = self.event_handlers.get(event_path, [])
         handlers.append(event)
         self.event_handlers[event_path] = handlers
-        print("Scheduled:", self.event_handlers)
+        print("Scheduled:", event_path, [(eh.msg.path, eh.msg.value) for eh in handlers])
 
     def schedule_before(self, event_path: str, msg: Message, force_record_meta=False, notify_agents=True):
         ev = EventHandler(msg, EVENT_BEFORE_HANDLER, force_record_meta, notify_agents)

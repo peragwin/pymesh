@@ -12,7 +12,8 @@ class Client:
         try:
             _, value = self.broker.latest(path)
             return value
-        except ValueError:
+        except ValueError as e:
+            print(e)
             return None
 
     def read_str(self, path: str) -> str:
