@@ -45,7 +45,6 @@ License: MIT
 """
 import struct
 import collections
-import datetime
 import sys
 import io
 
@@ -343,27 +342,27 @@ def _pack_ext(obj, fp, options):
         raise UnsupportedTypeException("huge ext data")
 
 
-def _pack_ext_timestamp(obj, fp, options):
-    delta = obj - _epoch
-    seconds = delta.seconds + delta.days * 86400
-    microseconds = delta.microseconds
+# def _pack_ext_timestamp(obj, fp, options):
+#     delta = obj - _epoch
+#     seconds = delta.seconds + delta.days * 86400
+#     microseconds = delta.microseconds
 
-    if microseconds == 0 and 0 <= seconds <= 2**32 - 1:
-        # 32-bit timestamp
-        fp.write(b"\xd6\xff" +
-                 struct.pack(">I", seconds))
-    elif 0 <= seconds <= 2**34 - 1:
-        # 64-bit timestamp
-        value = ((microseconds * 1000) << 34) | seconds
-        fp.write(b"\xd7\xff" +
-                 struct.pack(">Q", value))
-    elif -2**63 <= abs(seconds) <= 2**63 - 1:
-        # 96-bit timestamp
-        fp.write(b"\xc7\x0c\xff" +
-                 struct.pack(">I", microseconds * 1000) +
-                 struct.pack(">q", seconds))
-    else:
-        raise UnsupportedTypeException("huge timestamp")
+#     if microseconds == 0 and 0 <= seconds <= 2**32 - 1:
+#         # 32-bit timestamp
+#         fp.write(b"\xd6\xff" +
+#                  struct.pack(">I", seconds))
+#     elif 0 <= seconds <= 2**34 - 1:
+#         # 64-bit timestamp
+#         value = ((microseconds * 1000) << 34) | seconds
+#         fp.write(b"\xd7\xff" +
+#                  struct.pack(">Q", value))
+#     elif -2**63 <= abs(seconds) <= 2**63 - 1:
+#         # 96-bit timestamp
+#         fp.write(b"\xc7\x0c\xff" +
+#                  struct.pack(">I", microseconds * 1000) +
+#                  struct.pack(">q", seconds))
+#     else:
+#         raise UnsupportedTypeException("huge timestamp")
 
 
 def _pack_array(obj, fp, options):
@@ -395,79 +394,6 @@ def _pack_map(obj, fp, options):
         pack(v, fp, **options)
 
 ########################################
-
-
-# Pack for Python 2, with 'unicode' type, 'str' type, and 'long' type
-def _pack2(obj, fp, **options):
-    """
-    Serialize a Python object into MessagePack bytes.
-
-    Args:
-        obj: a Python object
-        fp: a .write()-supporting file-like object
-
-    Kwargs:
-        ext_handlers (dict): dictionary of Ext handlers, mapping a custom type
-                             to a callable that packs an instance of the type
-                             into an Ext object
-        force_float_precision (str): "single" to force packing floats as
-                                     IEEE-754 single-precision floats,
-                                     "double" to force packing floats as
-                                     IEEE-754 double-precision floats.
-
-    Returns:
-        None.
-
-    Raises:
-        UnsupportedType(PackException):
-            Object type not supported for packing.
-
-    Example:
-    >>> f = open('test.bin', 'wb')
-    >>> umsgpack.pack({u"compact": True, u"schema": 0}, f)
-    >>>
-    """
-    global compatibility
-
-    ext_handlers = options.get("ext_handlers")
-
-    if obj is None:
-        _pack_nil(obj, fp, options)
-    elif ext_handlers and obj.__class__ in ext_handlers:
-        _pack_ext(ext_handlers[obj.__class__](obj), fp, options)
-    elif isinstance(obj, bool):
-        _pack_boolean(obj, fp, options)
-    elif isinstance(obj, int) or isinstance(obj, long):
-        _pack_integer(obj, fp, options)
-    elif isinstance(obj, float):
-        _pack_float(obj, fp, options)
-    elif compatibility and isinstance(obj, unicode):
-        _pack_oldspec_raw(bytes(obj), fp, options)
-    elif compatibility and isinstance(obj, bytes):
-        _pack_oldspec_raw(obj, fp, options)
-    elif isinstance(obj, unicode):
-        _pack_string(obj, fp, options)
-    elif isinstance(obj, str):
-        _pack_binary(obj, fp, options)
-    elif isinstance(obj, list) or isinstance(obj, tuple):
-        _pack_array(obj, fp, options)
-    elif isinstance(obj, dict):
-        _pack_map(obj, fp, options)
-    elif isinstance(obj, datetime.datetime):
-        _pack_ext_timestamp(obj, fp, options)
-    elif isinstance(obj, Ext):
-        _pack_ext(obj, fp, options)
-    elif ext_handlers:
-        # Linear search for superclass
-        t = next((t for t in ext_handlers.keys() if isinstance(obj, t)), None)
-        if t:
-            _pack_ext(ext_handlers[t](obj), fp, options)
-        else:
-            raise UnsupportedTypeException(
-                "unsupported type: %s" % str(type(obj)))
-    else:
-        raise UnsupportedTypeException("unsupported type: %s" % str(type(obj)))
-
 
 # Pack for Python 3, with unicode 'str' type, 'bytes' type, and no 'long' type
 def _pack3(obj, fp, **options):
@@ -525,8 +451,8 @@ def _pack3(obj, fp, **options):
         _pack_array(obj, fp, options)
     elif isinstance(obj, dict):
         _pack_map(obj, fp, options)
-    elif isinstance(obj, datetime.datetime):
-        _pack_ext_timestamp(obj, fp, options)
+    # elif isinstance(obj, datetime.datetime):
+    #     _pack_ext_timestamp(obj, fp, options)
     elif isinstance(obj, Ext):
         _pack_ext(obj, fp, options)
     elif ext_handlers:
@@ -540,39 +466,6 @@ def _pack3(obj, fp, **options):
     else:
         raise UnsupportedTypeException(
             "unsupported type: %s" % str(type(obj)))
-
-
-def _packb2(obj, **options):
-    """
-    Serialize a Python object into MessagePack bytes.
-
-    Args:
-        obj: a Python object
-
-    Kwargs:
-        ext_handlers (dict): dictionary of Ext handlers, mapping a custom type
-                             to a callable that packs an instance of the type
-                             into an Ext object
-        force_float_precision (str): "single" to force packing floats as
-                                     IEEE-754 single-precision floats,
-                                     "double" to force packing floats as
-                                     IEEE-754 double-precision floats.
-
-    Returns:
-        A 'str' containing serialized MessagePack bytes.
-
-    Raises:
-        UnsupportedType(PackException):
-            Object type not supported for packing.
-
-    Example:
-    >>> umsgpack.packb({u"compact": True, u"schema": 0})
-    '\x82\xa7compact\xc3\xa6schema\x00'
-    >>>
-    """
-    fp = io.BytesIO()
-    _pack2(obj, fp, **options)
-    return fp.getvalue()
 
 
 def _packb3(obj, **options):
@@ -744,32 +637,32 @@ def _unpack_ext(code, fp, options):
         return ext_handlers[ext.type](ext)
 
     # Timestamp extension
-    if ext.type == -1:
-        return _unpack_ext_timestamp(ext, options)
+    # if ext.type == -1:
+    #     return _unpack_ext_timestamp(ext, options)
 
     return ext
 
 
-def _unpack_ext_timestamp(ext, options):
-    if len(ext.data) == 4:
-        # 32-bit timestamp
-        seconds = struct.unpack(">I", ext.data)[0]
-        microseconds = 0
-    elif len(ext.data) == 8:
-        # 64-bit timestamp
-        value = struct.unpack(">Q", ext.data)[0]
-        seconds = value & 0x3ffffffff
-        microseconds = (value >> 34) // 1000
-    elif len(ext.data) == 12:
-        # 96-bit timestamp
-        seconds = struct.unpack(">q", ext.data[4:12])[0]
-        microseconds = struct.unpack(">I", ext.data[0:4])[0] // 1000
-    else:
-        raise UnsupportedTimestampException(
-            "unsupported timestamp with data length %d" % len(ext.data))
+# def _unpack_ext_timestamp(ext, options):
+#     if len(ext.data) == 4:
+#         # 32-bit timestamp
+#         seconds = struct.unpack(">I", ext.data)[0]
+#         microseconds = 0
+#     elif len(ext.data) == 8:
+#         # 64-bit timestamp
+#         value = struct.unpack(">Q", ext.data)[0]
+#         seconds = value & 0x3ffffffff
+#         microseconds = (value >> 34) // 1000
+#     elif len(ext.data) == 12:
+#         # 96-bit timestamp
+#         seconds = struct.unpack(">q", ext.data[4:12])[0]
+#         microseconds = struct.unpack(">I", ext.data[0:4])[0] // 1000
+#     else:
+#         raise UnsupportedTimestampException(
+#             "unsupported timestamp with data length %d" % len(ext.data))
 
-    return _epoch + datetime.timedelta(seconds=seconds,
-                                       microseconds=microseconds)
+#     return _epoch + datetime.timedelta(seconds=seconds,
+#                                        microseconds=microseconds)
 
 
 def _unpack_array(code, fp, options):
@@ -833,50 +726,6 @@ def _unpack(fp, options):
     return _unpack_dispatch_table[code](code, fp, options)
 
 ########################################
-
-
-def _unpack2(fp, **options):
-    """
-    Deserialize MessagePack bytes into a Python object.
-
-    Args:
-        fp: a .read()-supporting file-like object
-
-    Kwargs:
-        ext_handlers (dict): dictionary of Ext handlers, mapping integer Ext
-                             type to a callable that unpacks an instance of
-                             Ext into an object
-        use_ordered_dict (bool): unpack maps into OrderedDict, instead of
-                                 unordered dict (default False)
-        allow_invalid_utf8 (bool): unpack invalid strings into instances of
-                                   InvalidString, for access to the bytes
-                                   (default False)
-
-    Returns:
-        A Python object.
-
-    Raises:
-        InsufficientDataException(UnpackException):
-            Insufficient data to unpack the serialized object.
-        InvalidStringException(UnpackException):
-            Invalid UTF-8 string encountered during unpacking.
-        UnsupportedTimestampException(UnpackException):
-            Unsupported timestamp format encountered during unpacking.
-        ReservedCodeException(UnpackException):
-            Reserved code encountered during unpacking.
-        UnhashableKeyException(UnpackException):
-            Unhashable key encountered during map unpacking.
-            The serialized map cannot be deserialized into a Python dictionary.
-        DuplicateKeyException(UnpackException):
-            Duplicate key encountered during map unpacking.
-
-    Example:
-    >>> f = open('test.bin', 'rb')
-    >>> umsgpack.unpackb(f)
-    {u'compact': True, u'schema': 0}
-    >>>
-    """
-    return _unpack(fp, options)
 
 
 def _unpack3(fp, **options):
@@ -1033,8 +882,6 @@ def __init():
     global load
     global loads
     global compatibility
-    global _epoch
-    global _utc_tzinfo
     global _float_precision
     global _unpack_dispatch_table
     global xrange
@@ -1042,19 +889,19 @@ def __init():
     # Compatibility mode for handling strings/bytes with the old specification
     compatibility = False
 
-    if sys.version_info[0] == 3:
-        _utc_tzinfo = datetime.timezone.utc
-    else:
-        _utc_tzinfo = None
+    # if sys.version_info[0] == 3:
+    #     _utc_tzinfo = datetime.timezone.utc
+    # else:
+    #     _utc_tzinfo = None
 
     # Calculate epoch datetime
-    _epoch = datetime.datetime(1970, 1, 1, tzinfo=_utc_tzinfo)
+    # _epoch = datetime.datetime(1970, 1, 1, tzinfo=_utc_tzinfo)
 
     # Auto-detect system float precision
-    if sys.float_info.mant_dig == 53:
-        _float_precision = "double"
-    else:
-        _float_precision = "single"
+    # if sys.float_info.mant_dig == 53:
+    #     _float_precision = "double"
+    # else:
+    _float_precision = "single"
 
     # Map packb and unpackb to the appropriate version
     if sys.version_info[0] == 3:
@@ -1068,14 +915,7 @@ def __init():
         loads = _unpackb3
         xrange = range
     else:
-        pack = _pack2
-        packb = _packb2
-        dump = _pack2
-        dumps = _packb2
-        unpack = _unpack2
-        unpackb = _unpackb2
-        load = _unpack2
-        loads = _unpackb2
+        raise ImportError("removed python 2 support")
 
     # Build a dispatch table for fast lookup of unpacking function
 
