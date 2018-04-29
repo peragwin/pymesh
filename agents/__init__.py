@@ -20,6 +20,9 @@ def network_set_parent(parent: str):
 CONFIG_HOPS_PATH = '/config/network/hops'
 SYSTEM_HOPS_PATH = '/system/network/hops'
 
+CONFIG_FTP_PATH = '/config/ftp'
+CONFIG_TELNET_PATH = '/config/telnet'
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
