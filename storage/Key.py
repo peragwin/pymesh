@@ -1,4 +1,5 @@
 import time
+import util
 
 def fmt_time(t: int) -> str:
     tt = time.localtime(t)[:6] + ('%d' % (1000*(t % 1)),)
@@ -14,7 +15,7 @@ def parse_time(t: str) -> int:
 class Key:
     """ Key is used to represent keys in storage """
 
-    def __init__(self, device_id: str, time: int, path: str, key: str):
+    def __init__(self, device_id: str, time: int, path: str, key: bytes):
         # if k:
         #     if isinstance(k, bytes):
         #         k = str(k, 'utf-8')
@@ -33,6 +34,8 @@ class Key:
     #     t = fmt_time(self.time)
     #     return ':'.join((t, self.device_id, self.data_id))
 
+def newKey(device_id: str, path: str, key: bytes):
+    return Key(device_id, util.now(), path, key)
 
 class Path:
     """ Path is a generator meant to traverse a Table path """

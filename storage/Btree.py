@@ -37,10 +37,8 @@ class Btree(Base):
         return bytes(k.device_id, 'utf-8') + \
             KEY_DELIMITER + \
             bytes(str(k.time), 'utf-8') + \
-            KEY_DELIMITER + \
-            bytes(k.path, 'utf-8') + \
-            KEY_DELIMITER + \
-            bytes(k.key, 'utf-8')
+            ((KEY_DELIMITER + bytes(k.path, 'utf-8')) if k.path else '')  + \
+            ((KEY_DELIMITER + bytes(k.key, 'utf-8')) if k.key else '')
 
     def _deserialize_key(self, b: bytes) -> Key:
         k = b.split(KEY_DELIMITER)
@@ -62,12 +60,12 @@ class Btree(Base):
         k = self._serialize_key(key)
         self.db[k] = value
 
-    def getRange(self, start: Key, end: Key, sort_order: int = DESC) \
+    def getRange(self, start: Key, end: Key, reverse: bool = False) \
         -> Generator[Tuple[Key, bytes], None, None]:
         
         s = self._serialize_key(start)
         e = self._serialize_key(end)
-        if sort_order == ASC:
+        if not reverse:
             items = self.db.items(s, e)
         else:
             items = self.db.items(s, e, self._btree.DESC)

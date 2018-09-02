@@ -1,9 +1,11 @@
 
-from storage.Key import Key
 
-# Possible orders for getRange
-ASC = 0
-DESC = 1
+try:
+    from typing import Generator, Tuple
+except:
+    pass
+
+from storage.Key import Key
 
 class Base:
     """ Base is the interface that any basic storage driver must implement """
@@ -17,5 +19,6 @@ class Base:
     def close(self):
         raise NotImplementedError
 
-    def getRange(self, start: Key, end: Key, order: int): # -> Generator[tuple]
+    def getRange(self, start: Key, end: Key, reverse: bool = False) \
+        -> Generator[Tuple[Key, bytes], None, None]:
         raise NotImplementedError
