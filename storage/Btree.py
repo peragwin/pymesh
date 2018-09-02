@@ -1,7 +1,12 @@
 
-from storage import ASC, DESC
-import btree
+try:
+    from typing import Generator, Tuple
+except:
+    pass
 
+from io import TextIOWrapper
+
+from storage import ASC, DESC, Base
 from storage.Key import Key
 
 DEFAULT_CACHE_SIZE = 100 * 1024 # 100 kB
@@ -13,15 +18,11 @@ END_DELIMITER = '\x1F'
 class Btree(Base):
     """ Data implements a datastore """
 
-    def __init__(self, store_path: str, cache_size=DEFAULT_CACHE_SIZE):
-        try:
-            f = open(store_path, "r+b")
-        except OSError:
-            f = open(store_path, "w+b")
-        self._file = f
-        self._path = store_path
+    def __init__(self, btree, stream: TextIOWrapper, cache_size=DEFAULT_CACHE_SIZE):
+        self._stream = stream
+        self._btree = btree
 
-        db = btree.open(f, cachesize=cache_size)
+        db = btree.open(stream, cachesize=cache_size)
         self.db = db
 
     def __del__(self):
@@ -30,16 +31,28 @@ class Btree(Base):
     def close(self):
         self.db.flush()
         self.db.close()
-        self._file.close()
+        self._stream.close()
 
-    def _serialize_key(self, k: Key) -> str:
-        bytes(k.device_id, 'utf-8') + \
-        KEY_DELIMITER + \
-        bytes(str(k.time), 'utf-8') + \
-        KEY_DELIMITER + \
-        bytes(k.path, 'utf-8') + \
-        KEY_DELIMITER + \
-        bytes(k.key, 'utf-8')
+    def _serialize_key(self, k: Key) -> bytes:
+        return bytes(k.device_id, 'utf-8') + \
+            KEY_DELIMITER + \
+            bytes(str(k.time), 'utf-8') + \
+            KEY_DELIMITER + \
+            bytes(k.path, 'utf-8') + \
+            KEY_DELIMITER + \
+            bytes(k.key, 'utf-8')
+
+    def _deserialize_key(self, b: bytes) -> Key:
+        k = b.split(KEY_DELIMITER)
+        try:
+            return Key(
+                str(k[0], 'utf-8'),
+                int(k[1]),
+                str(k[2], 'utf-8'),
+                str(k[3], 'utf-8'),
+            )
+        except:
+            raise ValueError("unable to deserialize key: " + str(b, 'utf-8'))
 
     def read(self, key: Key) -> bytes:
         k = self._serialize_key(key)
@@ -47,7 +60,43 @@ class Btree(Base):
 
     def write(self, key: Key, value: bytes):
         k = self._serialize_key(key)
-        return self.db[k] = value
+        self.db[k] = value
 
-    def getRange(self, start: bytes, end: bytes, sort_order: int = DESC) -> dict_items:
-        return self.db.items(start, end) if sort_order == ASC else self.db.items(start, end, btree.DESC)
+    def getRange(self, start: Key, end: Key, sort_order: int = DESC) \
+        -> Generator[Tuple[Key, bytes], None, None]:
+        
+        s = self._serialize_key(start)
+        e = self._serialize_key(end)
+        if sort_order == ASC:
+            items = self.db.items(s, e)
+        else:
+            items = self.db.items(s, e, self._btree.DESC)
+
+        for k, v in items:
+            yield (self._deserialize_key(k), v)
+
+def main():
+    class Mock(dict):
+        DESC = 1
+        def open(self, file, cache_size):
+            pass
+        def close(self):
+            pass
+        def flush(self):
+            pass
+    
+    bt = Btree(Mock(), None)
+
+    # test writes
+
+    # test reads
+
+    # test getRange
+
+    # test close
+
+    return 0
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())
