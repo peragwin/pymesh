@@ -1,12 +1,12 @@
+
 import btree
-import time
 
-CACHE_SIZE = 1024
+DEFAULT_CACHE_SIZE = 100 * 1024 # 100 kB
 
-class Data:
+class Btree(Base):
     """ Data implements a datastore """
 
-    def __init__(self, store_path: str, cache_size=CACHE_SIZE):
+    def __init__(self, store_path: str, cache_size=DEFAULT_CACHE_SIZE):
         try:
             f = open(store_path, "r+b")
         except OSError:
@@ -21,3 +21,12 @@ class Data:
         self.db.flush()
         self.db.close()
         self._file.close()
+
+    def read(self, key: bytes) -> bytes:
+        return self.db[key]
+
+    def write(self, key: bytes, value: bytes):
+        return self.db[key] = value
+
+    def getRange():
+        # TODO
