@@ -1,3 +1,5 @@
+
+from storage import ASC, DESC
 import btree
 
 DEFAULT_CACHE_SIZE = 100 * 1024 # 100 kB
