@@ -17,6 +17,9 @@ class Btree(Base):
         db = btree.open(f, cachesize=cache_size)
         self.db = db
 
+    def __del__(self):
+        self.close()
+
     def close(self):
         self.db.flush()
         self.db.close()
