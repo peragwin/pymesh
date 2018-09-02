@@ -31,5 +31,5 @@ class Btree(Base):
     def write(self, key: bytes, value: bytes):
         return self.db[key] = value
 
-    def getRange():
-        # TODO
+    def getRange(self, start: bytes, end: bytes, sort_order: int = ASC) -> dict_items:
+        return self.db.items(start, end) if sort_order == ASC else self.db.items(start, end, btree.DESC)
