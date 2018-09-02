@@ -2,7 +2,13 @@
 from storage import ASC, DESC
 import btree
 
+from storage.Key import Key
+
 DEFAULT_CACHE_SIZE = 100 * 1024 # 100 kB
+
+KEY_DELIMITER = '\x1C'
+START_DELIMITER = '\x00'
+END_DELIMITER = '\x1F'
 
 class Btree(Base):
     """ Data implements a datastore """
@@ -26,11 +32,22 @@ class Btree(Base):
         self.db.close()
         self._file.close()
 
-    def read(self, key: bytes) -> bytes:
-        return self.db[key]
+    def _serialize_key(self, k: Key) -> str:
+        bytes(k.device_id, 'utf-8') + \
+        KEY_DELIMITER + \
+        bytes(str(k.time), 'utf-8') + \
+        KEY_DELIMITER + \
+        bytes(k.path, 'utf-8') + \
+        KEY_DELIMITER + \
+        bytes(k.key, 'utf-8')
 
-    def write(self, key: bytes, value: bytes):
-        return self.db[key] = value
+    def read(self, key: Key) -> bytes:
+        k = self._serialize_key(key)
+        return self.db[k]
+
+    def write(self, key: Key, value: bytes):
+        k = self._serialize_key(key)
+        return self.db[k] = value
 
     def getRange(self, start: bytes, end: bytes, sort_order: int = DESC) -> dict_items:
         return self.db.items(start, end) if sort_order == ASC else self.db.items(start, end, btree.DESC)
