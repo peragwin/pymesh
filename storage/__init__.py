@@ -13,19 +13,25 @@ class StorageException(Exception):
 class PartitionAlreadyExistsError(StorageException):
     pass
 
+class UnsupportedIndexError(StorageException):
+    pass
+
 class Base:
     """ Base is the interface that any basic storage driver must implement """
 
-    def read(self, key: Key) -> bytes:
+    BY_TIME_INDEX = '\x01'
+    BY_PATH_INDEX = '\x02'
+
+    def get(self, key: Key, index: chr) -> bytes:
         raise NotImplementedError
     
-    def write(self, key: Key, value: bytes):
+    def store(self, key: Key, value: bytes, index: chr = Base.BY_TIME_INDEX):
         raise NotImplementedError
 
     def close(self):
         raise NotImplementedError
 
-    def getRange(self, start: Key, end: Key, reverse: bool = False) \
+    def getRange(self, start: Key, end: Key, reverse: bool = False, index: chr = Base.BY_TIME_INDEX) \
         -> Generator[Tuple[Key, bytes], None, None]:
         raise NotImplementedError
 
