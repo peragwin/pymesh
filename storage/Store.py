@@ -49,6 +49,12 @@ class Store:
 
     def createPartition(self, key: Key):
         """ createPartition for all keys that are prefixed with the given key """
+        # XXX should this really be creating a partition for both index types?
+        # (that may work for generic storage but only works on the deviceID key
+        # for the Btree driver)
+        # For now just assert that the key is only a deviceID key
+        assert (key.key or key.path or key.time) is None, \
+            "partition key cannot have any fields besides deviceID set for now.."
         self._store.createPartition(key, self._store.BY_TIME_INDEX)
         self._store.createPartition(key, self._store.BY_PATH_INDEX)
 

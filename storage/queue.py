@@ -1,6 +1,6 @@
 
 try:
-    from typing import List
+    from typing import List, Generator
 except ImportError:
     pass
 
@@ -14,7 +14,12 @@ class Queue:
         arbitrarily by any marker, but care should be taken to choose a partition
         marker that will not result in overlapping queues within the same storage.
         An offset is stored which marks the timestamp of the most recently written
-        item. """
+        item.
+        
+        TODO: currenlty only the deviceID field of the key is used to generate a
+        partition since the Store implementation creates both time and path indexed
+        partitions.
+    """
 
     def __init__(self, st: Store, key: Key):
         self._store = st
@@ -31,6 +36,23 @@ class Queue:
 
     def store(self, ns: List[Notification]):
         self._store.store(ns)
+
+    def get(self, key: Key, index: chr = Base.BY_TIME_INDEX) -> Notification:
+        return self._store.get(key, index)
+
+    def getPath(self, path: str, key: str = None) -> Generator[Notification, None, None]:
+        k = Key(self._key.device_id, None, path, key)
+        return self._store.getRange(k, k, index=Base.BY_PATH_INDEX)
+
+    def getFromOffset(self, offset: Key) -> Generator[Notification, None, None]:
+        return self._store.getRange(offset, self._key, index=Base.BY_TIME_INDEX)
+
+
+class Device(Queue):
+    """ Device creates a Queue for a given deviceID """
+    
+    def __init__(self, st: Store, deviceID: str):
+        super().__init__(st, Key(deviceID, None, None, None))
 
 
 def test() -> int:
