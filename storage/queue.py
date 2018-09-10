@@ -4,6 +4,7 @@ try:
 except ImportError:
     pass
 
+from storage import Base
 from storage.Store import Store
 from storage.Key import Key
 from storage.notification import Notification
@@ -15,33 +16,21 @@ class Queue:
         An offset is stored which marks the timestamp of the most recently written
         item. """
 
-    def __init__(self, st: Store, start: Key, end: Key):
-        self._start = start
-        self._end = end
-        try:
-            # try to get the most recent key written in this partition
-            _ = self.getOffset()
-        except StopIteration:
-            # partition exists but has no entries, so offset for this queue is 0
-            pass
-        except KeyError:
-            # partition doesn't exist yet, so we get to create it!
-            st.store([
-                Notification(start, None),
-                Notification(end, None),
-            ])
-
+    def __init__(self, st: Store, key: Key):
         self._store = st
+        if not self._store.hasPartition(key):
+            self._store.createPartition(key)
+        self._key = key
 
     def getOffset(self) -> int:
         try:
-            return next(self._store.getRange(self._start, self._end, reverse=True)).key.time
+            return next(self._store.getRange(self._key, self._key, reverse=True,
+                index=Base.BY_TIME_INDEX)).key.time
         except StopIteration:
             return 0
 
     def store(self, ns: List[Notification]):
         self._store.store(ns)
-    
 
 
 def test() -> int:

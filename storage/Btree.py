@@ -5,7 +5,6 @@ except:
     pass
 
 from io import TextIOWrapper
-
 from storage import Base
 from storage import PartitionAlreadyExistsError, UnsupportedIndexError
 from storage.Key import Key
@@ -14,7 +13,7 @@ DEFAULT_CACHE_SIZE = 128 * 1024 # 128 kB
 
 
 class Btree(Base):
-    """ Data implements a datastore. The default index is BY_TIME_INDEX but the driver
+    """ Btree implements a datastore. The default index is BY_TIME_INDEX but the driver
         also supports BY_PATH_INDEXing. """
     
     KEY_DELIMITER = '\x1C'
