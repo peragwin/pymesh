@@ -31,7 +31,8 @@ class Store:
                 'v': n.value,
                 'm': n.meta,
             }), self._store.BY_TIME_INDEX)
-            self._store.store(n.key, '\x00', self._store.BY_PATH_INDEX)
+            # store a link to the value using the path index
+            # self._store.store(n.key, '\x00', self._store.BY_PATH_INDEX)
 
     def _resolveIndex(self, index: chr) -> chr:
         if index == Base.BY_TIME_INDEX:
@@ -53,10 +54,10 @@ class Store:
         # (that may work for generic storage but only works on the deviceID key
         # for the Btree driver)
         # For now just assert that the key is only a deviceID key
-        assert (key.key or key.path or key.time) is None, \
-            "partition key cannot have any fields besides deviceID set for now.."
+        # assert (key.key or key.path or key.time) is None, \
+        #     "partition key cannot have any fields besides deviceID set for now.."
         self._store.createPartition(key, self._store.BY_TIME_INDEX)
-        self._store.createPartition(key, self._store.BY_PATH_INDEX)
+        # self._store.createPartition(key, self._store.BY_PATH_INDEX)
 
     def hasPartition(self, key: Key):
         """ hasPartition returns whether there is a partition for the given key in storage """

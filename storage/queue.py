@@ -40,7 +40,7 @@ class Queue:
     def get(self, key: Key, index: chr = Base.BY_TIME_INDEX) -> Notification:
         return self._store.get(key, index)
 
-    def getPath(self, path: str, key: str = None) -> Generator[Notification, None, None]:
+    def getPath(self, path: str, key: bytes = None) -> Generator[Notification, None, None]:
         k = Key(self._key.device_id, None, path, key)
         return self._store.getRange(k, k, index=Base.BY_PATH_INDEX)
 
@@ -48,11 +48,42 @@ class Queue:
         return self._store.getRange(offset, self._key, index=Base.BY_TIME_INDEX)
 
 
-class Device(Queue):
-    """ Device creates a Queue for a given deviceID """
+class LocalStorage:
+    """ LocalStorage creates local storage for a given deviceID. Internally a partition is created
+        using that deviceID and a timestamp of 0. All notifications are stored using time=0. """
     
     def __init__(self, st: Store, deviceID: str):
-        super().__init__(st, Key(deviceID, None, None, None))
+        self._store = st
+        key = Key(deviceID, 0, None, None)
+        if not self._store.hasPartition(key):
+            self._store.createPartition(key)
+        self._key = key
+
+    def store(self, ns: List[Notification]):
+        notifs = []
+        for n in ns:
+            key = Key(n.key.device_id, 0, n.key.path, n.key.key)
+            notifs.append(Notification(key, n.value, n.meta))
+            
+            # enforce creation of a partition for every path which allows us to get keys
+            key = Key(n.key.device_id, 0, n.key.path, None)
+            if not self._store.hasPartition(key):
+                self._store.createPartition(key)
+
+        self._store.store(notifs)
+
+    def storeLocal(self, path: str, key: bytes, value: object):
+        self.store([Notification(Key(self._key.device_id, 0, path, key), value)])
+
+    def get(self, key: Key) -> Notification:
+        return self._store.get(Key(key.device_id, 0, key.path, key.key))
+
+    def getLocal(self, path: str, key: bytes) -> object:
+        return self._store.get(Key(self._key.device_id, 0, path, key))
+
+    def getRangeLocal(self, path: str) -> Generator[bytes, None, None]:
+        key = Key(self._key.device_id, 0, path, None)
+        return self._store.getRange(key, key)
 
 
 def test() -> int:
