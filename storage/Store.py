@@ -62,3 +62,7 @@ class Store:
     def hasPartition(self, key: Key):
         """ hasPartition returns whether there is a partition for the given key in storage """
         self._store.hasPartition(key)
+
+
+def testStore() -> int:
+    return 0

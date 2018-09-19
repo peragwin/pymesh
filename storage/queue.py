@@ -81,16 +81,19 @@ class LocalStorage:
     def getLocal(self, path: str, key: bytes) -> object:
         return self._store.get(Key(self._key.device_id, 0, path, key))
 
-    def getRangeLocal(self, path: str) -> Generator[bytes, None, None]:
+    def getRangeLocal(self, path: str) -> Generator[Notification, None, None]:
         key = Key(self._key.device_id, 0, path, None)
         return self._store.getRange(key, key)
 
 
-def test() -> int:
+def testQueue() -> int:
     # test queue generates offset correctly
 
     pass
 
+def testLocalStorage() -> int:
+    pass
+
 if __name__ == '__main__':
     import sys
-    sys.exit(test())
+    sys.exit(testQueue() + testLocalStorage())
