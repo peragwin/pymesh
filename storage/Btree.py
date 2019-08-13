@@ -9,7 +9,7 @@ from io import TextIOWrapper
 from storage import ASC, DESC, Base
 from storage.Key import Key
 
-DEFAULT_CACHE_SIZE = 100 * 1024 # 100 kB
+DEFAULT_CACHE_SIZE = 128 * 1024 # 128 kB
 
 KEY_DELIMITER = '\x1C'
 START_DELIMITER = '\x00'
