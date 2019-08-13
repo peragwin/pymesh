@@ -54,6 +54,7 @@ class LocalStorage:
     
     def __init__(self, st: Store, deviceID: str):
         self._store = st
+        self._deviceID = deviceID
         key = Key(deviceID, 0, None, None)
         if not self._store.hasPartition(key):
             self._store.createPartition(key)
@@ -62,11 +63,11 @@ class LocalStorage:
     def store(self, ns: List[Notification]):
         notifs = []
         for n in ns:
-            key = Key(n.key.device_id, 0, n.key.path, n.key.key)
+            key = Key(self._deviceID, 0, n.key.path, n.key.key)
             notifs.append(Notification(key, n.value, n.meta))
             
             # enforce creation of a partition for every path which allows us to get keys
-            key = Key(n.key.device_id, 0, n.key.path, None)
+            key = Key(self._deviceID, 0, n.key.path, None)
             if not self._store.hasPartition(key):
                 self._store.createPartition(key)
 
